@@ -25,9 +25,8 @@
 async_proxy::async_proxy(event_loop &ev, int thread_num):
 	m_external_ev(ev), 
 	m_internal_ev(thread_num), 
-	req_pipe(ev, m_internal_ev), 
-	ack_pipe(m_internal_ev, ev), 
-	m_reqs_pended(0), m_acks_pended(0)
+	req_pipe(ev, m_internal_ev), m_reqs_pended(0), 
+	ack_pipe(m_internal_ev, ev), m_acks_pended(0)
 {
 	LOG("proxy init\n");
 }

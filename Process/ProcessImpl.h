@@ -22,10 +22,10 @@ protected:
 	virtual void do_delete(){}; // 强制结束进程
 	
 protected:
+	Process *m_parent;
 	bool m_has_started;
 	bool m_has_exited;
 	int m_exit_code;
-	Process *m_parent;
 	std::map<std::string, std::vector<std::string> > m_extended_env;
 	void putenvprivate(std::map<std::string, std::vector<std::string> > &env, std::string key, std::string val);
 };

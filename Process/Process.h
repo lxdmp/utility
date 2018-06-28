@@ -30,9 +30,10 @@ public:
 	std::vector<std::string> processArgList() const;
 	
 private:
-	boost::shared_ptr<ProcessImpl> m_dptr;
 	std::string m_name;
 	std::vector<std::string> m_args;
+	boost::shared_ptr<ProcessImpl> m_dptr;
 };
 
 #endif
+

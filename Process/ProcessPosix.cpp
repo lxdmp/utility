@@ -17,13 +17,13 @@
 ProcessPosix::ProcessPosix(Process *parent) : ProcessImpl(parent), 
 	m_child(-1)
 {
-	for(int i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
 		pipe_stdin[i] = -1;
-	for(int i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
 		pipe_stdout[i] = -1;
-	for(int i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
 		pipe_stderr[i] = -1;
-	for(int i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
+	for(size_t i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
 		exit_notify_pipe[i] = -1;
 }
 	
@@ -87,7 +87,7 @@ bool ProcessPosix::do_start()
 		std::vector<std::string> arg = m_parent->processArgList();
 		char* args[1024] = {NULL};
 		args[0] = const_cast<char*>(name.c_str());
-		for(int i=0; i<arg.size(); ++i)
+		for(size_t i=0; i<arg.size(); ++i)
 			args[1+i] = const_cast<char*>(arg[i].c_str());
 		::execvp(args[0], args);
 		::perror("exec failed\n");
@@ -95,13 +95,13 @@ bool ProcessPosix::do_start()
 	}
 
 ERROR_EXIT:
-	for(int i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
 		reset_pipe(&pipe_stdin[i]);
-	for(int i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
 		reset_pipe(&pipe_stdout[i]);
-	for(int i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
 		reset_pipe(&pipe_stderr[i]);
-	for(int i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
+	for(size_t i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
 		reset_pipe(&exit_notify_pipe[i]);
 	return false;
 }
@@ -121,14 +121,14 @@ int ProcessPosix::do_wait()
 		int max_fd = -1;
 		fd_set set;
 		FD_ZERO(&set);
-		for(int i=0; i<sizeof(array)/sizeof(array[0]); ++i){
+		for(size_t i=0; i<sizeof(array)/sizeof(array[0]); ++i){
 			if(array[i]>max_fd)
 				max_fd = array[i];
 			FD_SET(array[i], &set);
 		}
 	
 		int ret = ::select(max_fd+1, &set, NULL, NULL, NULL);
-		for(int i=0; i<sizeof(array)/sizeof(array[0]) && ret>0; ++i){
+		for(size_t i=0; i<sizeof(array)/sizeof(array[0]) && ret>0; ++i){
 			if(!FD_ISSET(array[i], &set))
 				continue;
 			--ret;
@@ -148,13 +148,13 @@ int ProcessPosix::do_wait()
 		}
 	}
 
-	for(int i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
 		reset_pipe(&pipe_stdin[i]);
-	for(int i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
 		reset_pipe(&pipe_stdout[i]);
-	for(int i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
 		reset_pipe(&pipe_stderr[i]);
-	for(int i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
+	for(size_t i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
 		reset_pipe(&exit_notify_pipe[i]);
 	return exit_code;
 }
@@ -168,13 +168,13 @@ void ProcessPosix::do_delete()
 		while(read(exit_notify_pipe[0], &buf, sizeof(buf))<=0);
 	}
 	
-	for(int i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdin)/sizeof(pipe_stdin[0]); ++i)
 		reset_pipe(&pipe_stdin[i]);
-	for(int i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stdout)/sizeof(pipe_stdout[0]); ++i)
 		reset_pipe(&pipe_stdout[i]);
-	for(int i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
+	for(size_t i=0; i<sizeof(pipe_stderr)/sizeof(pipe_stderr[0]); ++i)
 		reset_pipe(&pipe_stderr[i]);
-	for(int i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
+	for(size_t i=0; i<sizeof(exit_notify_pipe)/sizeof(exit_notify_pipe[0]); ++i)
 		reset_pipe(&exit_notify_pipe[i]);
 }
 

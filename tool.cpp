@@ -29,7 +29,7 @@ StringJoiner::StringJoiner(char ch) : _ch(ch)
 std::string StringJoiner::operator()(const std::vector<std::string> &l)
 {
 	std::string res;
-	for(int i=0; i<l.size(); ++i)
+	for(size_t i=0; i<l.size(); ++i)
 		res += l[i]+_ch;
 	if(res.length()>0)
 		res.erase(res.size()-1);
@@ -142,7 +142,7 @@ std::string actualPath()
 {
 	char buf[1024];
 	memset(buf, 0, sizeof(buf));
-	getcwd(buf, sizeof(buf));
+	::getcwd(buf, sizeof(buf));
 	return std::string(buf, strlen(buf));
 }
 
@@ -227,7 +227,6 @@ Compressor::Compressor(std::string compressor_path, std::string compressor_forma
 		_impl = boost::shared_ptr<CompressorImpl>(out.front());
 		_impl->setParent(this);
 	}catch(std::exception &e){
-		(int)(&e);
 		std::ostringstream s;
 		s<<"invalid compressor with path "<<_compressor_path<<" and with format "<<_compressor_format<<", no related implementation.";
 		throw std::runtime_error(s.str());

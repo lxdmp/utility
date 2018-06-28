@@ -51,9 +51,9 @@ void Binder::bind(const std::string &name, T &v, const char *default_value)
 {
 	EncodeBinder *encoder = NULL;
 	DecodeBinder *decoder = NULL;
-	if(decoder=dynamic_cast<DecodeBinder*>(this->binder_imp.get()))
+	if((decoder=dynamic_cast<DecodeBinder*>(this->binder_imp.get())))
         decoder->bind(name, v, default_value);
-	else if(encoder=dynamic_cast<EncodeBinder*>(this->binder_imp.get()))
+	else if((encoder=dynamic_cast<EncodeBinder*>(this->binder_imp.get())))
         encoder->bind(name, v, default_value);
 	else
 		throw CppBindException("internal implementation error");
