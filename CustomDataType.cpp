@@ -1,9 +1,9 @@
 ﻿#include "CustomDataType.h"
 #include "tool.h"
 
-/*
- * JsonPosixTime
- */
+/**************************
+ * JsonPosixTime - 日期时间
+ **************************/
 JsonPosixTime::JsonPosixTime()
 {
 	// YYYY-MM-DD hh:mm:ss
@@ -62,9 +62,9 @@ std::string JsonPosixTime::encode()
 	return s.str();
 }
 
-/*
- * JsonTimeDuration
- */
+/******************************
+ * JsonTimeDuration - 持续时间
+ ******************************/
 JsonTimeDuration::JsonTimeDuration()
 {
 	// hh:mm:ss
@@ -103,9 +103,9 @@ std::string JsonTimeDuration::encode()
 	return s.str();
 }
 
-/*
- * JsonGregorianDate
- */
+/***************************
+ * JsonGregorianDate - 日期
+ ***************************/
 JsonGregorianDate::JsonGregorianDate()
 {
 	// YYYY-MM-DD

@@ -6,6 +6,7 @@
 #include "cppbind/cppbind_json.hpp"
 #include "cppbind/spec_type.h"
 
+// 日期时间
 class JsonPosixTime : public boost::posix_time::ptime, public cppbind::SpecTypeBase 
 {
 public:
@@ -16,6 +17,7 @@ private:
     std::string encode();
 };
 
+// 持续时间
 class JsonTimeDuration : public boost::posix_time::time_duration, public cppbind::SpecTypeBase 
 {
 public:
@@ -26,6 +28,7 @@ private:
     std::string encode();
 };
 
+// 日期
 class JsonGregorianDate : public boost::gregorian::date, public cppbind::SpecTypeBase
 {
 public:
