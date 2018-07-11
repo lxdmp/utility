@@ -1,0 +1,4 @@
+Session : 声明一个会话具有的接口;
+MapSession : Session实现,以std::map与boost::any存储一个会话中的各项属性;
+SessionRepo : 声明会话管理器具有的接口;
+MapSessionRepo : SessionRepo实现,以std::map存储多个会话.
