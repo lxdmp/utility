@@ -184,7 +184,7 @@ int main()
 	}
 	
 	{
-		std::string key = "aab";
+		std::string key = "aaa";
 		int *val = Session::getAttribute<int>(*session, key);
 		if(!val)
 			std::cout<<"no attribute named "<<key<<std::endl;
