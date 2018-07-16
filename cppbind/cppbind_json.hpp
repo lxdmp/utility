@@ -24,8 +24,7 @@ class JsonBind
 public:
     boost::shared_ptr<T> decode(std::istream &is) const
 	{
-		std::string s;
-		is>>s;
+		std::string s((std::istreambuf_iterator<char>(is)), std::istreambuf_iterator<char>());
 		return this->decode(s);
     }
 
