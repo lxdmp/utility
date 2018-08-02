@@ -52,14 +52,18 @@ int main()
 	root->addSubNode(2, sub);
 	sub->addSubNode("a", new FlowChart<std::string, int>::ResultNode(boost::bind(result3, _1, _2)));
 	sub->addSubNode("b", new FlowChart<std::string, int>::ResultNode(boost::bind(result4, _1, _2)));
-	//sub->addSubNode("c", new FlowChart<std::string, int>::ResultNode(boost::bind(result1, _1, _2)));
+	sub->addSubNode(
+		std::greater<std::string>(), "c", 
+		new FlowChart<std::string, int>::ResultNode(boost::bind(result1, _1, _2))
+	);
 
 	const char* strs[] = {
 		"abc", 
 		"abcd",
 		"abcde", 
 		"bbcde", 
-		"cbcde"
+		"cbcde",
+		"dbcde"
 	};
 	for(size_t i=0; i<sizeof(strs)/sizeof(strs[0]); ++i)
 	{

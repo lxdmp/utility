@@ -10,7 +10,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
-#include <map>
+#include <vector>
 
 template<typename InputT, typename OutputT>
 class FlowChart
@@ -24,6 +24,25 @@ public:
 		virtual const Node* execute(const InputT &input, OutputT &output) const = 0;
 	};
 
+// 路由节点子分支
+public:
+	template<typename RouteT>
+	struct RouteNodeBranch
+	{
+		RouteNodeBranch(Node *node);
+		boost::shared_ptr<Node> _node;
+		virtual bool operator()(RouteT lhs) const = 0;
+	};
+
+	template<typename ComparatorT, typename RouteT>
+	struct RouteNodeBranchImpl : public RouteNodeBranch<RouteT>
+	{
+		RouteNodeBranchImpl(ComparatorT comparator, RouteT rhs, Node *node);
+		bool operator()(RouteT lhs) const;
+		ComparatorT _comparator;
+		RouteT _rhs;
+	};
+
 // 路由节点
 public:
 	template<typename RouteT>
@@ -34,10 +53,13 @@ public:
 	public:
 		RouteNode(RouteNodeLogicDecl logic);
 		virtual const Node* execute(const InputT &input, OutputT &output) const;
+
 		void addSubNode(RouteT routeVal, Node* node);
+		template<typename ComparatorT> 
+		void addSubNode(ComparatorT comparator, RouteT routeVal, Node* node);
 	private:
 		typename RouteNode<RouteT>::RouteNodeLogicDecl _node_logic;
-		std::map<RouteT, boost::shared_ptr<Node> > _map;
+		std::vector<boost::shared_ptr<RouteNodeBranch<RouteT> > > _branches;
 	};
 
 // 结果节点
