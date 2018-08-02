@@ -6,24 +6,34 @@
  ****************/
 template<typename InputT, typename OutputT>
 template<typename RouteT> 
-FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::RouteNodeBranch(Node *node) : _node(node)
+FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::RouteNodeBranch(
+	Node *node, BranchSelecterDecl selecter) : 
+	_node(node)
 {
+	_selecter.push_back(selecter);
+}
+
+
+template<typename InputT, typename OutputT>
+template<typename RouteT> 
+FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::RouteNodeBranch(
+	Node *node, BranchSelecterDecl selecter1, BranchSelecterDecl selecter2) : 
+	_node(node)
+{
+	_selecter.push_back(selecter1);
+	_selecter.push_back(selecter2);
 }
 
 template<typename InputT, typename OutputT>
-template<typename ComparatorT, typename RouteT>
-FlowChart<InputT, OutputT>::RouteNodeBranchImpl<ComparatorT, RouteT>::RouteNodeBranchImpl(
-	ComparatorT comparator, RouteT rhs, Node *node
-) : RouteNodeBranch<RouteT>(node), 
-	_comparator(comparator), _rhs(rhs)
+template<typename RouteT> 
+bool FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::operator()(RouteT routeVal) const
 {
-}
-
-template<typename InputT, typename OutputT>
-template<typename ComparatorT, typename RouteT>
-bool FlowChart<InputT, OutputT>::RouteNodeBranchImpl<ComparatorT, RouteT>::operator()(RouteT lhs) const
-{
-	return _comparator(lhs, _rhs);
+	for(size_t selecter_idx=0; selecter_idx<this->_selecter.size(); ++selecter_idx)
+	{
+		if(!this->_selecter[selecter_idx](routeVal))
+			return false;
+	}
+	return true;
 }
 
 /**********
@@ -52,7 +62,27 @@ void FlowChart<InputT, OutputT>::RouteNode<RouteT>::addSubNode(
 	if(!node)
 		throw std::runtime_error("invalid node added");
 	boost::shared_ptr<RouteNodeBranch<RouteT> > new_branch = boost::shared_ptr<RouteNodeBranch<RouteT> >(
-		new RouteNodeBranchImpl<ComparatorT, RouteT>(comparator, routeVal, node)
+		new RouteNodeBranch<RouteT>(node, std::bind2nd(comparator, routeVal))
+	);
+	_branches.push_back(new_branch);
+}
+
+
+template<typename InputT, typename OutputT>
+template<typename RouteT>
+template<typename ComparatorT1, typename ComparatorT2> 
+void FlowChart<InputT, OutputT>::RouteNode<RouteT>::addSubNode(
+	ComparatorT1 comparator1, RouteT routeVal1, 
+	ComparatorT2 comparator2, RouteT routeVal2, Node* node)
+{
+	if(!node)
+		throw std::runtime_error("invalid node added");
+	boost::shared_ptr<RouteNodeBranch<RouteT> > new_branch = boost::shared_ptr<RouteNodeBranch<RouteT> >(
+		new RouteNodeBranch<RouteT>(
+			node, 
+			std::bind2nd(comparator1, routeVal1), 
+			std::bind2nd(comparator2, routeVal2)
+		)
 	);
 	_branches.push_back(new_branch);
 }

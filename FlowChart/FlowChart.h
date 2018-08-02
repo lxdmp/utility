@@ -29,18 +29,13 @@ public:
 	template<typename RouteT>
 	struct RouteNodeBranch
 	{
-		RouteNodeBranch(Node *node);
+		typedef boost::function<bool(RouteT)> BranchSelecterDecl;
 		boost::shared_ptr<Node> _node;
-		virtual bool operator()(RouteT lhs) const = 0;
-	};
+		std::vector<BranchSelecterDecl> _selecter;
 
-	template<typename ComparatorT, typename RouteT>
-	struct RouteNodeBranchImpl : public RouteNodeBranch<RouteT>
-	{
-		RouteNodeBranchImpl(ComparatorT comparator, RouteT rhs, Node *node);
-		bool operator()(RouteT lhs) const;
-		ComparatorT _comparator;
-		RouteT _rhs;
+		RouteNodeBranch(Node *node, BranchSelecterDecl selecter);
+		RouteNodeBranch(Node *node, BranchSelecterDecl selecter1, BranchSelecterDecl selecter2);
+		bool operator()(RouteT routeVal) const;
 	};
 
 // 路由节点
@@ -55,8 +50,14 @@ public:
 		virtual const Node* execute(const InputT &input, OutputT &output) const;
 
 		void addSubNode(RouteT routeVal, Node* node);
+
 		template<typename ComparatorT> 
 		void addSubNode(ComparatorT comparator, RouteT routeVal, Node* node);
+
+		template<typename ComparatorT1, typename ComparatorT2> 
+		void addSubNode(ComparatorT1 comparator1, RouteT routeVal1, 
+			ComparatorT2 comparator2, RouteT routeVal2, Node* node);
+
 	private:
 		typename RouteNode<RouteT>::RouteNodeLogicDecl _node_logic;
 		std::vector<boost::shared_ptr<RouteNodeBranch<RouteT> > > _branches;

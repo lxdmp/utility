@@ -51,7 +51,11 @@ int main()
 	FlowChart<std::string, int>::RouteNode<std::string> *sub = new FlowChart<std::string, int>::RouteNode<std::string>(boost::bind(route2, _1, _2));
 	root->addSubNode(2, sub);
 	sub->addSubNode("a", new FlowChart<std::string, int>::ResultNode(boost::bind(result3, _1, _2)));
-	sub->addSubNode("b", new FlowChart<std::string, int>::ResultNode(boost::bind(result4, _1, _2)));
+	sub->addSubNode(
+		std::greater<std::string>(), "b", 
+		std::less<std::string>(), "d", 
+		new FlowChart<std::string, int>::ResultNode(boost::bind(result4, _1, _2))
+	);
 	sub->addSubNode(
 		std::greater<std::string>(), "c", 
 		new FlowChart<std::string, int>::ResultNode(boost::bind(result1, _1, _2))
