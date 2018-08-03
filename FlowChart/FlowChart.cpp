@@ -52,12 +52,14 @@ int main()
 	root->addSubNode(2, sub);
 	sub->addSubNode("a", new FlowChart<std::string, int>::ResultNode(boost::bind(result3, _1, _2)));
 	sub->addSubNode(
-		std::greater<std::string>(), "b", 
+		//std::greater<std::string>(), "b", 
+		">=", "b", 
 		std::less<std::string>(), "d", 
 		new FlowChart<std::string, int>::ResultNode(boost::bind(result4, _1, _2))
 	);
 	sub->addSubNode(
 		std::greater<std::string>(), "c", 
+		//">", "c", 
 		new FlowChart<std::string, int>::ResultNode(boost::bind(result1, _1, _2))
 	);
 

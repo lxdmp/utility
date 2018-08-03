@@ -15,6 +15,12 @@
 template<typename InputT, typename OutputT>
 class FlowChart
 {
+	template<int v>
+	class Int2Type
+	{
+		enum {value = v };
+	};
+
 // 节点
 public:
 	class Node
@@ -27,15 +33,30 @@ public:
 // 路由节点子分支
 public:
 	template<typename RouteT>
-	struct RouteNodeBranch
+	class RouteNodeBranch
 	{
+	public:
 		typedef boost::function<bool(RouteT)> BranchSelecterDecl;
-		boost::shared_ptr<Node> _node;
-		std::vector<BranchSelecterDecl> _selecter;
 
 		RouteNodeBranch(Node *node, BranchSelecterDecl selecter);
 		RouteNodeBranch(Node *node, BranchSelecterDecl selecter1, BranchSelecterDecl selecter2);
+
 		bool operator()(RouteT routeVal) const;
+
+		boost::shared_ptr<Node> node() const{return _node;}
+
+		template<typename ComparatorT> 
+		static BranchSelecterDecl bindSelecter(ComparatorT comparator, RouteT routeVal);
+
+	private:
+		template<typename ComparatorT> 
+		static BranchSelecterDecl bindSelecterImpl(ComparatorT comparator, RouteT routeVal, Int2Type<false> commonCase);
+		template<typename ComparatorT> 
+		static BranchSelecterDecl bindSelecterImpl(ComparatorT comparator, RouteT routeVal, Int2Type<true> stringCase);
+
+	private:
+		boost::shared_ptr<Node> _node; // 指向的节点
+		std::vector<BranchSelecterDecl> _selecter; // 需满足的条件
 	};
 
 // 路由节点
@@ -49,14 +70,14 @@ public:
 		RouteNode(RouteNodeLogicDecl logic);
 		virtual const Node* execute(const InputT &input, OutputT &output) const;
 
-		void addSubNode(RouteT routeVal, Node* node);
+		void addSubNode(RouteT routeVal, Node *node);
 
 		template<typename ComparatorT> 
-		void addSubNode(ComparatorT comparator, RouteT routeVal, Node* node);
+		void addSubNode(ComparatorT comparator, RouteT routeVal, Node *node);
 
 		template<typename ComparatorT1, typename ComparatorT2> 
 		void addSubNode(ComparatorT1 comparator1, RouteT routeVal1, 
-			ComparatorT2 comparator2, RouteT routeVal2, Node* node);
+			ComparatorT2 comparator2, RouteT routeVal2, Node *node);
 
 	private:
 		typename RouteNode<RouteT>::RouteNodeLogicDecl _node_logic;

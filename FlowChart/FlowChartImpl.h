@@ -1,6 +1,30 @@
 ﻿#ifndef _FLOW_CHART_IMPL_H_
 #define _FLOW_CHART_IMPL_H_
 
+template<typename T>
+struct IsString
+{
+	enum{value=false};
+};
+
+template<>
+struct IsString<std::string>
+{
+	enum{value=true};
+};
+
+template<>
+struct IsString<const char*>
+{
+	enum{value=true};
+};
+
+template<>
+struct IsString<char*>
+{
+	enum{value=true};
+};
+
 /****************
  * 路由节点子分支
  ****************/
@@ -10,6 +34,8 @@ FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::RouteNodeBranch(
 	Node *node, BranchSelecterDecl selecter) : 
 	_node(node)
 {
+	if(!_node)
+		throw std::runtime_error("invalid node added");
 	_selecter.push_back(selecter);
 }
 
@@ -20,6 +46,8 @@ FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::RouteNodeBranch(
 	Node *node, BranchSelecterDecl selecter1, BranchSelecterDecl selecter2) : 
 	_node(node)
 {
+	if(!_node)
+		throw std::runtime_error("invalid node added");
 	_selecter.push_back(selecter1);
 	_selecter.push_back(selecter2);
 }
@@ -34,6 +62,61 @@ bool FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::operator()(RouteT rout
 			return false;
 	}
 	return true;
+}
+
+template<typename InputT, typename OutputT>
+template<typename RouteT> 
+template<typename ComparatorT> 
+typename FlowChart<InputT, OutputT>::template RouteNodeBranch<RouteT>::BranchSelecterDecl 
+FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecter(
+	ComparatorT comparator, RouteT routeVal
+)
+{
+	return FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecterImpl(comparator, routeVal, Int2Type<IsString<ComparatorT>::value>());
+}
+
+template<typename InputT, typename OutputT>
+template<typename RouteT> 
+template<typename ComparatorT> 
+typename FlowChart<InputT, OutputT>::template RouteNodeBranch<RouteT>::BranchSelecterDecl 
+FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecterImpl(
+	ComparatorT comparator, RouteT routeVal, Int2Type<false> commonCase
+)
+{
+	return std::bind2nd(comparator, routeVal);
+}
+
+
+template<typename InputT, typename OutputT>
+template<typename RouteT> 
+template<typename ComparatorT> 
+typename FlowChart<InputT, OutputT>::template RouteNodeBranch<RouteT>::BranchSelecterDecl 
+FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecterImpl(
+	ComparatorT comparator, RouteT routeVal, Int2Type<true> stringCase
+)
+{
+	struct match_pair{
+		std::string name;
+		typedef boost::function<bool(RouteT, RouteT)> ComparatorDecl;
+		ComparatorDecl impl;
+	};
+	static struct match_pair matches[] = {
+		{"!=", std::not_equal_to<RouteT>()}, 
+		{"<", std::less<RouteT>()}, 
+		{"<=", std::less_equal<RouteT>()}, 
+		{"==", std::equal_to<RouteT>()}, 
+		{">", std::greater<RouteT>()}, 
+		{">=", std::greater_equal<RouteT>()}
+	};
+	size_t idx = 0;
+	for(; idx<sizeof(matches)/sizeof(matches[0]); ++idx)
+	{
+		if(matches[idx].name.compare(comparator)==0)
+			break;
+	}
+	if(idx>=sizeof(matches)/sizeof(matches[0]))
+		throw std::runtime_error("");
+	return std::bind2nd(matches[idx].impl, routeVal);
 }
 
 /**********
@@ -59,14 +142,14 @@ template<typename ComparatorT>
 void FlowChart<InputT, OutputT>::RouteNode<RouteT>::addSubNode(
 	ComparatorT comparator, RouteT routeVal, Node *node)
 {
-	if(!node)
-		throw std::runtime_error("invalid node added");
 	boost::shared_ptr<RouteNodeBranch<RouteT> > new_branch = boost::shared_ptr<RouteNodeBranch<RouteT> >(
-		new RouteNodeBranch<RouteT>(node, std::bind2nd(comparator, routeVal))
+		new RouteNodeBranch<RouteT>(
+			node, 
+			FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecter(comparator, routeVal)
+		)
 	);
 	_branches.push_back(new_branch);
 }
-
 
 template<typename InputT, typename OutputT>
 template<typename RouteT>
@@ -75,13 +158,11 @@ void FlowChart<InputT, OutputT>::RouteNode<RouteT>::addSubNode(
 	ComparatorT1 comparator1, RouteT routeVal1, 
 	ComparatorT2 comparator2, RouteT routeVal2, Node* node)
 {
-	if(!node)
-		throw std::runtime_error("invalid node added");
 	boost::shared_ptr<RouteNodeBranch<RouteT> > new_branch = boost::shared_ptr<RouteNodeBranch<RouteT> >(
 		new RouteNodeBranch<RouteT>(
 			node, 
-			std::bind2nd(comparator1, routeVal1), 
-			std::bind2nd(comparator2, routeVal2)
+			FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecter(comparator1, routeVal1),
+			FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecter(comparator2, routeVal2)
 		)
 	);
 	_branches.push_back(new_branch);
@@ -96,7 +177,7 @@ const typename FlowChart<InputT, OutputT>::Node* FlowChart<InputT, OutputT>::Rou
 	for(size_t branch_idx=0; branch_idx<this->_branches.size(); ++branch_idx)
 	{
 		if(_branches[branch_idx]->operator()(routeNodeResult))
-			return _branches[branch_idx]->_node.get();
+			return _branches[branch_idx]->node().get();
 	}
 	throw std::runtime_error("Unhandled route case!");
 	return NULL;
