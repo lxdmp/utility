@@ -51,6 +51,7 @@ public:
 	void load(const char *file_path, std::vector<ObjBaseT*> &out) const; // out中分配的对象需由用户程序维护
 	void load(const std::string &content, std::vector<ObjBaseT*> &out) const;
 	void load(cJSON *root, std::vector<ObjBaseT*> &out) const;
+	ObjBaseT* load(cJSON *node, bool ignoreIllegalKey=false) const;
 
 private:
 	std::map<std::string, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> > > _tbl;

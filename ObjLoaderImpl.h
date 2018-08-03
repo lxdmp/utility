@@ -65,17 +65,28 @@ void ObjLoader<ObjBaseT>::load(cJSON *root, std::vector<ObjBaseT*> &out) const
 {
 	for(cJSON *node=root->child; node; node=node->next)
 	{
-		std::string obj_name(node->string);
-		typename std::map<std::string, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> > >::const_iterator factory_iter = _tbl.find(obj_name);
-		if(factory_iter==_tbl.end())
+		ObjBaseT *obj = this->load(node);
+		if(obj)
+			out.push_back(obj);
+	}
+}
+
+template <typename ObjBaseT> 
+ObjBaseT* ObjLoader<ObjBaseT>::load(cJSON *node, bool ignoreIllegalKey) const
+{
+	std::string obj_name(node->string);
+	typename std::map<std::string, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> > >::const_iterator factory_iter = _tbl.find(obj_name);
+	if(factory_iter==_tbl.end())
+	{
+		if(!ignoreIllegalKey)
 		{
 			std::ostringstream s;
 			s<<"key named "<<obj_name<<" without indicated loader!!";
 			throw std::runtime_error(s.str().c_str());
 		}
-		ObjBaseT *obj = factory_iter->second->create(node);
-		out.push_back(obj);
+		return NULL;
 	}
+	return factory_iter->second->create(node);
 }
 
 #endif
