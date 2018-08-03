@@ -45,8 +45,15 @@ public:
 
 		boost::shared_ptr<Node> node() const{return _node;}
 
+		/*
+		 * ComparatorT支持以下类型:
+		 * - functor : bool()(const RouteT&, const RouteT&) const, 包含std::less,std::greater,...;
+		 * - std::string : '>,>=,!=,==,...', 等效于std::less,std::greater,...
+		 * 
+		 * 上一级节点的输出作为lhs,与rhs通过运算决定是否流向指向的节点.
+		 */
 		template<typename ComparatorT> 
-		static BranchSelecterDecl bindSelecter(ComparatorT comparator, RouteT routeVal);
+		static BranchSelecterDecl bindSelecter(ComparatorT comparator, RouteT rhs);
 
 	private:
 		template<typename ComparatorT> 

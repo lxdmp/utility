@@ -26,6 +26,12 @@ struct StringStripper
 	char _ch;
 };
 
+struct StringIgnoreCase
+{
+	bool operator()(const std::string &s1, const std::string &s2) const;
+	static int compare(const std::string &s1, const std::string &s2);
+};
+
 struct ChDir
 {
 	ChDir(std::string target);

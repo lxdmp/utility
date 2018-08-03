@@ -1,6 +1,15 @@
 ﻿#include "tool.h"
 #include <boost/filesystem.hpp>
 
+#if defined(_WIN32) || defined(_WIN64) // 统一用posix名
+#include <direct.h>
+#define getcwd _getcwd
+#define chdir _chdir
+#define strcasecmp _stricmp
+#else
+#include <dirent.h>
+#endif
+
 StringSplitter::StringSplitter(char ch) : _ch(ch)
 {
 }
@@ -51,15 +60,15 @@ std::string StringStripper::operator()(const std::string &s)
 	return s.substr(start, end-start+1);
 }
 
-#include <boost/filesystem.hpp>
+bool StringIgnoreCase::operator()(const std::string &s1, const std::string &s2) const
+{
+	return StringIgnoreCase::compare(s1, s2)<0;
+}
 
-#if defined(_WIN32) || defined(_WIN64) // 统一用posix名
-#include <direct.h>
-#define getcwd _getcwd
-#define chdir _chdir
-#else
-#include <dirent.h>
-#endif
+int StringIgnoreCase::compare(const std::string &s1, const std::string &s2)
+{
+	return strcasecmp(s1.c_str(), s2.c_str());
+}
 
 ChDir::ChDir(std::string target)
 {
