@@ -1,6 +1,8 @@
 ﻿#ifndef _FLOW_CHART_IMPL_H_
 #define _FLOW_CHART_IMPL_H_
 
+#include <sstream>
+
 template<typename T>
 struct IsString
 {
@@ -54,7 +56,8 @@ FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::RouteNodeBranch(
 
 template<typename InputT, typename OutputT>
 template<typename RouteT> 
-bool FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::operator()(RouteT routeVal) const
+bool FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::operator()(
+	const RouteT &routeVal) const
 {
 	for(size_t selecter_idx=0; selecter_idx<this->_selecter.size(); ++selecter_idx)
 	{
@@ -100,7 +103,7 @@ FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecterImpl(
 		typedef boost::function<bool(RouteT, RouteT)> ComparatorDecl;
 		ComparatorDecl impl;
 	};
-	static struct match_pair matches[] = {
+	static const struct match_pair matches[] = {
 		{"!=", std::not_equal_to<RouteT>()}, 
 		{"<", std::less<RouteT>()}, 
 		{"<=", std::less_equal<RouteT>()}, 
@@ -115,7 +118,11 @@ FlowChart<InputT, OutputT>::RouteNodeBranch<RouteT>::bindSelecterImpl(
 			break;
 	}
 	if(idx>=sizeof(matches)/sizeof(matches[0]))
-		throw std::runtime_error("");
+	{
+		std::ostringstream s;
+		s<<"Unrecognized comparator \""<<comparator<<"\"";
+		throw std::runtime_error(s.str());
+	}
 	return std::bind2nd(matches[idx].impl, routeVal);
 }
 
