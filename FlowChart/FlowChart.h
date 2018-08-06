@@ -36,12 +36,12 @@ public:
 	class RouteNodeBranch
 	{
 	public:
-		typedef boost::function<bool(RouteT)> BranchSelecterDecl;
+		typedef boost::function<bool(const RouteT&)> BranchSelecterDecl;
 
 		RouteNodeBranch(Node *node, BranchSelecterDecl selecter);
 		RouteNodeBranch(Node *node, BranchSelecterDecl selecter1, BranchSelecterDecl selecter2);
 
-		bool operator()(RouteT routeVal) const;
+		bool operator()(const RouteT &routeVal) const;
 
 		boost::shared_ptr<Node> node() const{return _node;}
 
