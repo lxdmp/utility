@@ -5,11 +5,12 @@
 #define __FUNCTION__ __PRETTY_FUNCTION__
 #endif
 
-// 读写锁定义
-#include <boost/thread/mutex.hpp>
-typedef boost::shared_lock<boost::shared_mutex> read_lock;
-typedef boost::unique_lock<boost::shared_mutex> write_lock;
+#define BOOST_ASIO_DISABLE_STD_CHRONO
+
+#include <boost/thread/shared_mutex.hpp>
 typedef boost::shared_mutex rw_mutex;
+typedef boost::shared_lock<rw_mutex> read_lock;
+typedef boost::unique_lock<rw_mutex> write_lock;
 
 #endif
 

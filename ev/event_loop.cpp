@@ -1,7 +1,6 @@
 ﻿#include <iostream>
 #include <sstream>
 #include "event_loop.h"
-#include "define.h"
 
 #define ENABLE_LOG
 #undef ENABLE_LOG
