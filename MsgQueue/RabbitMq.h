@@ -32,8 +32,6 @@ public:
 
 	rabbit_mq& update();
 
-	void test(){std::cout<<"test"<<std::endl;}
-
 public:
 	template<typename MutableBufferSequenceT, typename ReadHandlerT> 
 	void async_read_some_impl(const MutableBufferSequenceT &buffer, ReadHandlerT handler);

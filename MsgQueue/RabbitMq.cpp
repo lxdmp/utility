@@ -94,38 +94,76 @@ void rabbit_mq::shutdown_later()
 #include <boost/bind.hpp>
 #include "../ev/event_loop.h"
 
-struct custom_logic
+struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 {
-	custom_logic(event_loop *ev) : _ev(ev){}
-
-	void connectHandler(const boost::system::error_code &ec)
+	custom_logic(event_loop *ev, boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal) : 
+		_ev(ev), _terminal(terminal)
 	{
-		// 投递消息
 	}
 
-	void writeHandler()
+	void writeHandler(const boost::system::error_code &ec, std::size_t bytes_transferred)
 	{
+		std::cout<<"custom_logic writeHandler : "<<pthread_self()<<std::endl;
+		if(ec)
+			throw boost::system::system_error(ec);
+
+		_buf.consume(bytes_transferred);
+		fprintf(stdout, "%s : %d bytes written\n", __FUNCTION__, bytes_transferred);
+	
+		/*
+	boost::shared_ptr<echo_pair> parent = m_parent.lock();
+	if(parent.get())
+	{
+		if(m_buf.size()>0)
+		{
+			std::string c(boost::asio::buffers_begin(m_buf.data()), boost::asio::buffers_end(m_buf.data())); 
+			m_buf.consume(m_buf.size());
+			LOG("%s : msg \"%s\" not written, continue to send\n", __FUNCTION__, c.c_str());
+			parent->try_write_once(m_sock, c, m_remote_ep);
+		}else
+		{
+			LOG("%s : all msg written, try to read more\n", __FUNCTION__);
+			parent->try_read_once(m_sock);
+		}
+	}
+	*/
+		_terminal->shutdown_later(boost::bind(&custom_logic::shutdownHandler, shared_from_this()));
 	}
 
 	void shutdownHandler()
 	{
 		// 结束
+		std::cout<<"closed"<<std::endl;
+		this->_ev->terminate();
 	}
 
 	event_loop *_ev;
+	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > _terminal;
+	boost::asio::streambuf _buf;
 };
 
 int main()
 {
 	event_loop ev;
 	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal = msg_queue_terminal<rabbit_mq>::build();
-	(*terminal).bindEventLoop(&ev)
-		.test();
-	boost::shared_ptr<custom_logic> logic = boost::make_shared<custom_logic>(&ev);
+	(*terminal).bindEventLoop(&ev, 1)
+		.setBrokerHost("127.0.0.1")
+		.setConnectTimeout(1000)
+		.setVirtualHost("/")
+		.setUserName("guest")
+		.setPassword("guest")
+		.setChannelMaxNum(10);
 
-	// 连接
-	//terminal->async_connect("127.0.0.1", 5672, 100, boost::bind(&custom_logic::connectHandler, logic, _1));
-
+	boost::shared_ptr<custom_logic> logic = boost::make_shared<custom_logic>(&ev, terminal);
+	std::ostream os(&logic->_buf);
+	os<<"qwer";
+	(*terminal).withExchange("test.topic")
+		.withRoutingKey("test.123");
+	terminal->async_write_some(
+		logic->_buf.data(), 
+		boost::bind(&custom_logic::writeHandler, logic, _1, _2)
+	);
+	std::cout<<"main : "<<pthread_self()<<std::endl;
 	return ev.exec();
 }
 #endif

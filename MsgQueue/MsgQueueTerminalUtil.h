@@ -14,7 +14,7 @@ public:
 private:
 	static unsigned long current_thread_id();
 
-	boost::shared_mutex _access_lock;
+	mutable boost::shared_mutex _access_lock;
 	std::map<unsigned long, ValueT> _tbl;
 };
 

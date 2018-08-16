@@ -10,7 +10,29 @@
 #include <amqp_tcp_socket.h>
 #include "MsgQueueTerminalUtil.h"
 
-#define TRACE(x) fprintf(stdout, "%s\n", x)
+#define RABBIT_MQ_ENABLE_LOG
+//#undef RABBIT_MQ_ENABLE_LOG
+
+#if defined(RABBIT_MQ_ENABLE_LOG)
+#include <boost/date_time/posix_time/posix_time.hpp>
+#define RABBIT_MQ_LOG(...) \
+	do{ \
+		char buf[1024]; \
+		memset(buf, 0, sizeof(buf)); \
+		sprintf(buf, __VA_ARGS__); \
+		boost::posix_time::ptime actual = boost::posix_time::second_clock::local_time(); \
+		std::cout<<std::setfill('0') \
+			<<std::setw(4)<<actual.date().year()<<"-" \
+			<<std::setw(2)<<actual.date().month().as_number()<<"-" \
+			<<std::setw(2)<<actual.date().day()<<" " \
+			<<std::setw(2)<<actual.time_of_day().hours()<<":" \
+			<<std::setw(2)<<actual.time_of_day().minutes()<<":" \
+			<<std::setw(2)<<actual.time_of_day().seconds()<<" - " \
+			<<__FUNCTION__<<" - "<<buf<<std::endl; \
+	}while(0)
+#else
+#define RABBIT_MQ_LOG(...)
+#endif
 
 /*****************
  * rabbit_mq_impl
@@ -197,7 +219,7 @@ public:
 					shared_from_this(), 
 					buffer, handler
 				));
-				context.installChannel(used_channel);
+				context->installChannel(used_channel);
 				this->post_async_req(context);
 				need_buffer_req = false;
 			}
@@ -253,12 +275,20 @@ private:
 			throw std::runtime_error("internal error, pended-requests-num negative.");
 
 		if(this->_pended_requests_num>0)
+		{
+			int pended_num = this->_pended_requests_num;
+			RABBIT_MQ_LOG("%d reqs pended, try to shutdown later.", pended_num);
 			return;
+		}
+
 		size_t num_of_reqs_posted = this->post_buffered_reqs();
 		if(num_of_reqs_posted!=1)
+		{
 			throw std::runtime_error("internal error, post multi reqs for shutdown.");
-		else
+		}else{
 			this->go_to_stat(rabbit_mq_impl::SHUTDOWN_IN_PROGRESS);
+			RABBIT_MQ_LOG("now shutdown req posted.");
+		}
 	}
 
 private:
@@ -324,6 +354,9 @@ private:
 			boost::bind(&ContextT::work, request), 
 			boost::bind(&ContextT::ack, request)
 		));
+
+		int pended_num = this->_pended_requests_num;
+		RABBIT_MQ_LOG("async req posted, %d reqs pended.", pended_num);
 	}
 
 	size_t post_buffered_reqs()
@@ -359,12 +392,25 @@ private:
 				decide_to_push = true;
 		}
 		if(decide_to_push)
+		{
 			this->_buffered_requests.push(new_req);
+			RABBIT_MQ_LOG("new req buffered.");
+		}
 	}
 
 private:
 	void schedule_once()
 	{
+		// 真正的调度配合定时器进行,防止请求由于声明周期未被释放.
+		
+	}
+
+	void do_schedule_once()
+	{
+		RABBIT_MQ_LOG("schedule on stat %s with thread %lu", 
+			this->format_stat(this->_stat), pthread_self()
+		);
+
 		switch(this->_stat)
 		{
 		case rabbit_mq_impl::IDLE: 
@@ -387,7 +433,10 @@ private:
 			this->go_to_stat(rabbit_mq_impl::LOGGING_IN);
 			break;
 		case rabbit_mq_impl::LOGGED_IN: // 已登录
-			this->post_buffered_reqs();
+			{
+				size_t posted_num = this->post_buffered_reqs();
+				RABBIT_MQ_LOG("%d reqs posted.", posted_num);
+			}
 			break;
 		case rabbit_mq_impl::SHUTDOWN_LATER: // 预备关闭
 			this->try_to_shutdown();
@@ -571,11 +620,14 @@ private:
 
 		void installChannel(boost::shared_ptr<channel_t> used_channel)
 		{
-			assert(used_channel.get());
+			assert(used_channel.get() && !this->_used_channel.get());
 			this->_used_channel = used_channel;
+			RABBIT_MQ_LOG("channel %d(%s) installed.", 
+				used_channel->_chn_idx, (used_channel->opened()?"opened":"closed")
+			);
 		}
 
-		boost::weak_ptr<channel_t> _used_channel;
+		boost::shared_ptr<channel_t> _used_channel;
 	};
 
 	// read_context_t
@@ -605,26 +657,24 @@ private:
 				return;
 			}
 
-			boost::shared_ptr<channel_t> used_channel = _used_channel.lock();
-			if(!used_channel.get())
+			if(!_used_channel.get())
 			{
 				this->_read_result = boost::system::errc::operation_canceled;
 				return;
 			}
 
-			if(used_channel->closed())
+			if(_used_channel->closed())
 			{
-				amqp_channel_open(parent->_connection, used_channel->_chn_idx);
+				amqp_channel_open(parent->_connection, _used_channel->_chn_idx);
 				if(amqp_get_rpc_reply(parent->_connection).reply_type!=AMQP_RESPONSE_NORMAL)
 				{
 					this->_read_result = boost::system::errc::io_error;
 					return;
-				}else{
-					used_channel->open();
 				}
+				_used_channel->open();
 			}
 
-			if(amqp_basic_get(parent->_connection, used_channel->_chn_idx,
+			if(amqp_basic_get(parent->_connection, _used_channel->_chn_idx,
 				amqp_cstring_bytes(this->_with_queue), true).reply_type!=AMQP_RESPONSE_NORMAL)
 			{
 				this->_read_result = boost::system::errc::no_message_available;
@@ -632,7 +682,7 @@ private:
 			}
 
 			amqp_message_t message;
-			if(amqp_read_message(parent->_connection, used_channel->_chn_idx, 
+			if(amqp_read_message(parent->_connection, _used_channel->_chn_idx, 
 				&message, 0).reply_type!=AMQP_RESPONSE_NORMAL)
 			{
 				amqp_destroy_message(&message);
@@ -653,13 +703,13 @@ private:
 			if(!parent)
 				return;
 
-			boost::shared_ptr<channel_t> used_channel = _used_channel.lock();
-			if(used_channel.get())
+			if(_used_channel.get())
 			{
-				if(used_channel->opened())
-					parent->push_channel(parent->_available_channels, used_channel);
+				if(_used_channel->opened())
+					parent->push_channel(parent->_available_channels, _used_channel);
 				else
-					parent->push_channel(parent->_not_available_channels, used_channel);
+					parent->push_channel(parent->_not_available_channels, _used_channel);
+				this->_used_channel.reset();
 			}
 
 			boost::system::error_code ec = boost::system::errc::make_error_code(this->_read_result);
@@ -706,31 +756,30 @@ private:
 				return;
 			}
 
-			boost::shared_ptr<channel_t> used_channel = _used_channel.lock();
-			if(!used_channel.get())
+			if(!_used_channel.get())
 			{
 				this->_write_result = boost::system::errc::operation_canceled; 
 				return;
 			}
 
-			if(used_channel->closed())
+			if(_used_channel->closed())
 			{
-				amqp_channel_open(parent->_connection, used_channel->_chn_idx);
+				amqp_channel_open(parent->_connection, _used_channel->_chn_idx);
 				if(amqp_get_rpc_reply(parent->_connection).reply_type!=AMQP_RESPONSE_NORMAL)
 				{
 					this->_write_result = boost::system::errc::io_error;
 					return;
-				}else{
-					used_channel->open();
 				}
+				_used_channel->open();
 			}
 
 			amqp_basic_properties_t props;
 			props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
 			props.content_type = amqp_cstring_bytes("text/plain");
 			props.delivery_mode = 1;
-			std::string s(boost::asio::buffers_begin(this->_buffer), boost::asio::buffers_end(this->_buffer)); 
-			if(amqp_basic_publish(parent->_connection, used_channel->_chn_idx, 
+			std::string s(boost::asio::buffers_begin(this->_buffer), boost::asio::buffers_end(this->_buffer));
+			RABBIT_MQ_LOG("msg \"%s\" will be written, %d bytes.", s.c_str(), s.length());
+			if(amqp_basic_publish(parent->_connection, _used_channel->_chn_idx, 
 				amqp_cstring_bytes(this->_with_exchange.c_str()), 
 				amqp_cstring_bytes(this->_with_routing_key.c_str()), 
 				0, 0, 
@@ -739,6 +788,8 @@ private:
 				this->_write_result = boost::system::errc::io_error;
 				return;
 			}
+			this->_bytes_written = s.length();
+			RABBIT_MQ_LOG("msg written with success.");
 		}
 
 		virtual void ack()
@@ -747,13 +798,13 @@ private:
 			if(!parent)
 				return;
 
-			boost::shared_ptr<channel_t> used_channel = _used_channel.lock();
-			if(used_channel.get())
+			if(_used_channel.get())
 			{
-				if(used_channel->opened())
-					parent->push_channel(parent->_available_channels, used_channel);
+				if(_used_channel->opened())
+					parent->push_channel(parent->_available_channels, _used_channel);
 				else
-					parent->push_channel(parent->_not_available_channels, used_channel);
+					parent->push_channel(parent->_not_available_channels, _used_channel);
+				_used_channel.reset();
 			}
 
 			boost::system::error_code ec = boost::system::errc::make_error_code(this->_write_result);
@@ -799,9 +850,7 @@ private:
 					channel->_chn_idx, 
 					AMQP_REPLY_SUCCESS).reply_type!=AMQP_RESPONSE_NORMAL)
 				{
-					std::ostringstream s;
-					s<<"channel with idx "<<channel->_chn_idx<<" closed failed.";
-					TRACE(s.str().c_str());
+					RABBIT_MQ_LOG("channel with idx %d closed failed.", channel->_chn_idx);
 				}else{
 					channel->close();
 					parent->push_channel(parent->_not_available_channels, channel);
@@ -813,14 +862,14 @@ private:
 			if(amqp_connection_close(
 				parent->_connection, AMQP_REPLY_SUCCESS).reply_type!=AMQP_RESPONSE_NORMAL)
 			{
-				TRACE("close connection failed.");
+				RABBIT_MQ_LOG("close connection failed.");
 				this->_shutdown_result = boost::system::errc::io_error;
 				return;
 			}
 
 			if(amqp_destroy_connection(parent->_connection)!=AMQP_STATUS_OK)
 			{
-				TRACE("destroy connection failed.");
+				RABBIT_MQ_LOG("destroy connection failed.");
 				this->_shutdown_result = boost::system::errc::io_error;
 				return;
 			}
@@ -849,12 +898,13 @@ private:
 
 			if(this->_shutdown_result!=boost::system::errc::success)
 			{
-				TRACE(boost::system::system_error(
+				RABBIT_MQ_LOG("%s", boost::system::system_error(
 					boost::system::errc::make_error_code(this->_shutdown_result)
 				).what());
 			}
 			this->_handler();
 
+			printf("123\n");
 			parent->go_to_stat(rabbit_mq_impl::IDLE);
 		}
 
@@ -904,25 +954,27 @@ private:
 
 	void go_to_stat(rabbit_mq_impl::rabbit_mq_terminal_stat_t new_stat)
 	{
+		bool decide_to_change_stat = false;
 		bool updated = false;
 
 		if(this->is_shutdown_stat(new_stat))
 		{
-			this->_stat = new_stat;
-			updated = true;
+			decide_to_change_stat = true;
 		}else{
 			if(!will_shutdown())
 			{
-				this->_stat = new_stat;
-				updated = true;
+				decide_to_change_stat = true;
+			}else{
+				if( this->_stat==rabbit_mq_impl::SHUTDOWN_IN_PROGRESS && 
+					new_stat==rabbit_mq_impl::IDLE )
+					decide_to_change_stat = true;
 			}
 		}
 
-		if(updated)
+		if(decide_to_change_stat)
 		{
-			std::ostringstream s;
-			s<<"go to stat "<<this->format_stat(this->_stat)<<".";
-			TRACE(s.str().c_str());
+			this->_stat = new_stat;
+			RABBIT_MQ_LOG("go to stat %s.", this->format_stat(this->_stat));
 		}
 	}
 
