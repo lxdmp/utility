@@ -174,32 +174,22 @@ public:
 	void async_read_some_impl(const MutableBufferSequenceT &buffer, ReadHandlerT handler)
 	{
 		typedef rabbit_mq_impl::read_context_t<MutableBufferSequenceT, ReadHandlerT> read_context_t;
-		bool need_buffer_req = true;
+
+		boost::shared_ptr<read_context_t> new_request(new read_context_t(
+			shared_from_this(), 
+			buffer, handler
+		));
 
 		if(this->_stat==rabbit_mq_impl::LOGGED_IN)
 		{
-			boost::shared_ptr<channel_t> used_channel = this->apply_for_channel();
-			if(used_channel.get())
+			if(new_request->ready_to_be_posted(*this))
 			{
-				boost::shared_ptr<read_context_t> context(new read_context_t(
-					shared_from_this(), 
-					buffer, handler
-				));
-				context.installChannel(used_channel);
-				this->post_async_req(context);
-				need_buffer_req = false;
+				this->post_async_req(new_request);
+				return;
 			}
 		}
 
-		if(need_buffer_req)
-		{
-			boost::shared_ptr<rabbit_mq_impl::request_t> new_request(new read_context_t(
-				shared_from_this(), 
-				buffer, handler
-			));
-			this->buffer_req(new_request);
-		}
-
+		this->buffer_req(new_request);
 		if(this->_stat==rabbit_mq_impl::IDLE)
 			this->schedule_once();
 	}
@@ -208,32 +198,22 @@ public:
 	void async_write_some_impl(const ConstBufferSequenceT &buffer, WriteHandlerT handler)
 	{
 		typedef rabbit_mq_impl::write_context_t<ConstBufferSequenceT, WriteHandlerT> write_context_t;
-		bool need_buffer_req = true;
+		
+		boost::shared_ptr<rabbit_mq_impl::request_t> new_request(new write_context_t(
+			shared_from_this(), 
+			buffer, handler
+		));
 
 		if(this->_stat==rabbit_mq_impl::LOGGED_IN)
 		{
-			boost::shared_ptr<channel_t> used_channel = this->apply_for_channel();
-			if(used_channel.get())
+			if(new_request->ready_to_be_posted(*this))
 			{
-				boost::shared_ptr<write_context_t> context(new write_context_t(
-					shared_from_this(), 
-					buffer, handler
-				));
-				context->installChannel(used_channel);
-				this->post_async_req(context);
-				need_buffer_req = false;
+				this->post_async_req(new_request);
+				return;
 			}
 		}
 
-		if(need_buffer_req)
-		{
-			boost::shared_ptr<rabbit_mq_impl::request_t> new_request(new write_context_t(
-				shared_from_this(), 
-				buffer, handler
-			));
-			this->buffer_req(new_request);
-		}
-
+		this->buffer_req(new_request);
 		if(this->_stat==rabbit_mq_impl::IDLE)
 			this->schedule_once();
 	}
@@ -244,8 +224,12 @@ public:
 		typedef rabbit_mq_impl::shutdown_context_t<ShutdownHandlerT> shutdown_context_t;
 
 		if(this->will_shutdown())
+		{
+			RABBIT_MQ_LOG("aleady in will-shutdown stat.");
 			return;
+		}
 
+		RABBIT_MQ_LOG("shutdown later...");
 		this->go_to_stat(rabbit_mq_impl::SHUTDOWN_LATER);
 
 		this->clear_buffered_reqs(); // 清空还在排队的读写请求
@@ -330,16 +314,16 @@ private:
 		{
 		}
 
-		virtual ~request_t()
+		virtual ~request_t(){}
+
+		virtual void work() = 0;
+		virtual void ack()
 		{
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent.get())
 				return;
 			--parent->_pended_requests_num;
 		}
-
-		virtual void work() = 0;
-		virtual void ack() = 0;
 		
 		virtual bool ready_to_be_posted(rabbit_mq_impl &parent){return true;}
 
@@ -394,18 +378,12 @@ private:
 		if(decide_to_push)
 		{
 			this->_buffered_requests.push(new_req);
-			RABBIT_MQ_LOG("new req buffered.");
+			RABBIT_MQ_LOG("new req buffered, %d in total.", this->_buffered_requests.size());
 		}
 	}
 
 private:
 	void schedule_once()
-	{
-		// 真正的调度配合定时器进行,防止请求由于声明周期未被释放.
-		
-	}
-
-	void do_schedule_once()
 	{
 		RABBIT_MQ_LOG("schedule on stat %s with thread %lu", 
 			this->format_stat(this->_stat), pthread_self()
@@ -441,13 +419,16 @@ private:
 		case rabbit_mq_impl::SHUTDOWN_LATER: // 预备关闭
 			this->try_to_shutdown();
 			break;
+		case rabbit_mq_impl::SHUTDOWN_IN_PROGRESS: // 关闭中
+			// 各种应用场景,可能在关闭过程中触发调度.
+			break;
 		case rabbit_mq_impl::ALLOC: // 资源分配中
 		case rabbit_mq_impl::CONNECTING: // 连接中
 		case rabbit_mq_impl::LOGGING_IN: // 登录中
-		case rabbit_mq_impl::SHUTDOWN_IN_PROGRESS: // 关闭中
 		default:
 			std::ostringstream error_info;
-			error_info<<"internal logic error : invalid internal state "<<this->_stat<<".";
+			error_info<<"internal logic error : invalid internal state "
+				<<this->format_stat(this->_stat)<<".";
 			throw std::runtime_error(error_info.str());
 		}
 	}
@@ -488,6 +469,8 @@ private:
 
 		virtual void ack()
 		{
+			rabbit_mq_impl::request_t::ack();
+
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent)
 				return;
@@ -537,6 +520,8 @@ private:
 
 		virtual void ack()
 		{
+			rabbit_mq_impl::request_t::ack();
+
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent)
 				return;
@@ -584,6 +569,8 @@ private:
 
 		virtual void ack()
 		{
+			rabbit_mq_impl::request_t::ack();
+
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent)
 				return;
@@ -625,6 +612,11 @@ private:
 			RABBIT_MQ_LOG("channel %d(%s) installed.", 
 				used_channel->_chn_idx, (used_channel->opened()?"opened":"closed")
 			);
+		}
+
+		virtual void ack()
+		{
+			rabbit_mq_impl::request_t::ack();
 		}
 
 		boost::shared_ptr<channel_t> _used_channel;
@@ -699,6 +691,8 @@ private:
 
 		virtual void ack()
 		{
+			rabbit_mq_impl::rw_context_t::ack();
+
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent)
 				return;
@@ -717,7 +711,7 @@ private:
 			parent->schedule_once();
 		}
 
-		const MutableBufferSequenceT &_buffer;
+		MutableBufferSequenceT _buffer;
 		ReadHandlerT _handler;
 		std::string _with_queue;
 		boost::system::errc::errc_t _read_result;
@@ -777,7 +771,10 @@ private:
 			props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
 			props.content_type = amqp_cstring_bytes("text/plain");
 			props.delivery_mode = 1;
-			std::string s(boost::asio::buffers_begin(this->_buffer), boost::asio::buffers_end(this->_buffer));
+			std::string s(
+				boost::asio::buffers_begin(this->_buffer), 
+				boost::asio::buffers_end(this->_buffer)
+			);
 			RABBIT_MQ_LOG("msg \"%s\" will be written, %d bytes.", s.c_str(), s.length());
 			if(amqp_basic_publish(parent->_connection, _used_channel->_chn_idx, 
 				amqp_cstring_bytes(this->_with_exchange.c_str()), 
@@ -794,6 +791,8 @@ private:
 
 		virtual void ack()
 		{
+			rabbit_mq_impl::rw_context_t::ack();
+
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent)
 				return;
@@ -812,7 +811,7 @@ private:
 			parent->schedule_once();
 		}
 
-		const ConstBufferSequenceT &_buffer;
+		ConstBufferSequenceT _buffer;
 		WriteHandlerT _handler;
 		std::string _with_exchange, _with_routing_key;
 		boost::system::errc::errc_t _write_result;
@@ -877,6 +876,8 @@ private:
 
 		virtual void ack()
 		{
+			rabbit_mq_impl::request_t::ack();
+
 			boost::shared_ptr<rabbit_mq_impl> parent = _parent.lock();
 			if(!parent)
 				return;
@@ -902,10 +903,8 @@ private:
 					boost::system::errc::make_error_code(this->_shutdown_result)
 				).what());
 			}
-			this->_handler();
-
-			printf("123\n");
 			parent->go_to_stat(rabbit_mq_impl::IDLE);
+			this->_handler();
 		}
 
 		ShutdownHandlerT _handler;

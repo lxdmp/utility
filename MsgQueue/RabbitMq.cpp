@@ -86,18 +86,25 @@ void rabbit_mq::shutdown_later()
 	this->_impl->shutdown_later();
 }
 
-#ifdef RABBIT_MSG_QUEUE_TEST
+
+#ifdef RABBIT_MSG_QUEUE_RECV_TEST
+
+#endif
+
+#ifdef RABBIT_MSG_QUEUE_SEND_TEST
 #include "MsgQueueTerminal.h"
 #include "RabbitMq.h"
 #include <boost/system/error_code.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include "../ev/event_loop.h"
 
 struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 {
 	custom_logic(event_loop *ev, boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal) : 
-		_ev(ev), _terminal(terminal)
+		_ev(ev), _terminal(terminal), 
+		_limit(10)
 	{
 	}
 
@@ -109,37 +116,45 @@ struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 
 		_buf.consume(bytes_transferred);
 		fprintf(stdout, "%s : %d bytes written\n", __FUNCTION__, bytes_transferred);
-	
-		/*
-	boost::shared_ptr<echo_pair> parent = m_parent.lock();
-	if(parent.get())
-	{
-		if(m_buf.size()>0)
-		{
-			std::string c(boost::asio::buffers_begin(m_buf.data()), boost::asio::buffers_end(m_buf.data())); 
-			m_buf.consume(m_buf.size());
-			LOG("%s : msg \"%s\" not written, continue to send\n", __FUNCTION__, c.c_str());
-			parent->try_write_once(m_sock, c, m_remote_ep);
-		}else
-		{
-			LOG("%s : all msg written, try to read more\n", __FUNCTION__);
-			parent->try_read_once(m_sock);
-		}
-	}
-	*/
-		_terminal->shutdown_later(boost::bind(&custom_logic::shutdownHandler, shared_from_this()));
+		if(!this->send())
+			_terminal->shutdown_later(boost::bind(&custom_logic::shutdownHandler, shared_from_this()));
 	}
 
 	void shutdownHandler()
 	{
 		// 结束
-		std::cout<<"closed"<<std::endl;
+		std::cout<<"already closed, exit ev."<<std::endl;
 		this->_ev->terminate();
+	}
+
+	bool send()
+	{
+		const int last = 0;
+		if(_limit--<=last)
+			return false;
+		bool this_is_last = false;
+		if(_limit==last)
+			this_is_last = true;
+
+		boost::asio::streambuf &buf = this->_buf;
+		std::ostream os(&buf);
+		if(!this_is_last)
+			os<<_limit<<std::endl;
+		else
+			os<<"exit";
+		(*_terminal).withExchange("test.topic")
+			.withRoutingKey("test.123");
+		_terminal->async_write_some(
+			buf.data(), 
+			boost::bind(&custom_logic::writeHandler, shared_from_this(), _1, _2)
+		);
+		return true;
 	}
 
 	event_loop *_ev;
 	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > _terminal;
 	boost::asio::streambuf _buf;
+	int _limit;
 };
 
 int main()
@@ -155,14 +170,11 @@ int main()
 		.setChannelMaxNum(10);
 
 	boost::shared_ptr<custom_logic> logic = boost::make_shared<custom_logic>(&ev, terminal);
-	std::ostream os(&logic->_buf);
-	os<<"qwer";
-	(*terminal).withExchange("test.topic")
-		.withRoutingKey("test.123");
-	terminal->async_write_some(
-		logic->_buf.data(), 
-		boost::bind(&custom_logic::writeHandler, logic, _1, _2)
-	);
+
+	boost::shared_ptr<boost::asio::steady_timer> timer(new boost::asio::steady_timer(ev.get_io_service()));
+	timer->expires_from_now(boost::chrono::microseconds(0));
+	timer->async_wait(boost::bind(&custom_logic::send, logic));
+
 	std::cout<<"main : "<<pthread_self()<<std::endl;
 	return ev.exec();
 }
