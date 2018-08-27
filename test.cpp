@@ -1,10 +1,11 @@
-#ifdef CPPBIND_JSON_TEST
 #include <iostream>
 #include <string>
 #include <vector>
 #include <map>
 #include "CustomDataType.h"
+#include "tool.h"
 
+#ifdef CPPBIND_JSON_TEST
 class Test1
 {
 public:
@@ -170,6 +171,11 @@ int main()
 	}catch(std::exception &e){
 		std::cout<<e.what();
 	}
+
+	std::vector<std::string> a;
+	a.push_back("1");
+	a.push_back("2");
+	std::cout<<StringJoiner(',')(a)<<std::endl;
 
 	return 0;
 }

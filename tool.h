@@ -16,6 +16,8 @@ struct StringJoiner
 {
 	StringJoiner(char ch);
 	std::string operator()(const std::vector<std::string> &l);
+	template <typename IteratorT> 
+	std::string operator()(IteratorT begin, IteratorT end);
 	char _ch;
 };
 
@@ -87,4 +89,21 @@ private:
 	std::string _compressor_format;
 };
 
+/*
+ * template implementation
+ */
+template<typename IteratorT> 
+std::string StringJoiner::operator()(IteratorT begin, IteratorT end)
+{
+	std::string res;
+	for(IteratorT iter=begin; iter!=end; ++iter)
+	{
+		if(iter!=begin)
+			res.append(1, _ch);
+		res.append(*iter);
+	}
+	return res;
+}
+
 #endif
+

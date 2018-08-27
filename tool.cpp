@@ -37,12 +37,7 @@ StringJoiner::StringJoiner(char ch) : _ch(ch)
 
 std::string StringJoiner::operator()(const std::vector<std::string> &l)
 {
-	std::string res;
-	for(size_t i=0; i<l.size(); ++i)
-		res += l[i]+_ch;
-	if(res.length()>0)
-		res.erase(res.size()-1);
-	return res;
+	return this->operator()(l.begin(), l.end());
 }
 
 StringStripper::StringStripper(char ch) : _ch(ch)
