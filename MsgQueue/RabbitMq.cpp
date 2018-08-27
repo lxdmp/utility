@@ -102,22 +102,30 @@ void rabbit_mq::shutdown_later()
 
 struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 {
+	struct send_context
+	{
+		send_context(boost::shared_ptr<custom_logic> parent) : _parent(parent){}
+		void onWritten(const boost::system::error_code &ec, std::size_t bytes_transferred)
+		{
+			std::cout<<"custom_logic::send_context::onWritten : "<<pthread_self()<<std::endl;
+			if(ec)
+				throw boost::system::system_error(ec);
+
+			_buf.consume(bytes_transferred);
+			fprintf(stdout, "%s : %d bytes written\n", __FUNCTION__, bytes_transferred);
+			if(!_parent->send())
+				_parent->_terminal->shutdown_later(
+					boost::bind(&custom_logic::shutdownHandler, _parent)
+				);
+		}
+		boost::shared_ptr<custom_logic> _parent;
+		boost::asio::streambuf _buf;
+	};
+
 	custom_logic(event_loop *ev, boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal) : 
 		_ev(ev), _terminal(terminal), 
-		_limit(10)
+		_limit(50)
 	{
-	}
-
-	void writeHandler(const boost::system::error_code &ec, std::size_t bytes_transferred)
-	{
-		std::cout<<"custom_logic writeHandler : "<<pthread_self()<<std::endl;
-		if(ec)
-			throw boost::system::system_error(ec);
-
-		_buf.consume(bytes_transferred);
-		fprintf(stdout, "%s : %d bytes written\n", __FUNCTION__, bytes_transferred);
-		if(!this->send())
-			_terminal->shutdown_later(boost::bind(&custom_logic::shutdownHandler, shared_from_this()));
 	}
 
 	void shutdownHandler()
@@ -129,31 +137,39 @@ struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 
 	bool send()
 	{
+		printf("\nsend once!!!\n\n");
 		const int last = 0;
-		if(_limit--<=last)
-			return false;
-		bool this_is_last = false;
-		if(_limit==last)
-			this_is_last = true;
+		for(size_t i=0; i<10; ++i)
+		{
+			if(_limit--<=last)
+				return false;
+			bool this_is_last = false;
+			if(_limit==last)
+				this_is_last = true;
 
-		boost::asio::streambuf &buf = this->_buf;
-		std::ostream os(&buf);
-		if(!this_is_last)
-			os<<_limit<<std::endl;
+			boost::shared_ptr<send_context> context(new send_context(shared_from_this()));
+			boost::asio::streambuf &buf = context->_buf;
+			std::ostream os(&buf);
+			if(!this_is_last)
+				os<<_limit<<std::endl;
+			else
+				os<<"exit";
+			(*_terminal).withExchange("test.topic")
+				.withRoutingKey("test.123");
+			_terminal->async_write_some(
+				buf.data(), 
+				boost::bind(&send_context::onWritten, context, _1, _2)
+			);
+			//return true;
+		}
+		if(_limit<=last)
+			return false;
 		else
-			os<<"exit";
-		(*_terminal).withExchange("test.topic")
-			.withRoutingKey("test.123");
-		_terminal->async_write_some(
-			buf.data(), 
-			boost::bind(&custom_logic::writeHandler, shared_from_this(), _1, _2)
-		);
-		return true;
+			return true;
 	}
 
 	event_loop *_ev;
 	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > _terminal;
-	boost::asio::streambuf _buf;
 	int _limit;
 };
 
@@ -161,7 +177,7 @@ int main()
 {
 	event_loop ev;
 	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal = msg_queue_terminal<rabbit_mq>::build();
-	(*terminal).bindEventLoop(&ev, 1)
+	(*terminal).bindEventLoop(&ev, 10)
 		.setBrokerHost("127.0.0.1")
 		.setConnectTimeout(1000)
 		.setVirtualHost("/")

@@ -362,8 +362,12 @@ private:
 	void clear_buffered_reqs()
 	{
 		std::queue<boost::shared_ptr<rabbit_mq_impl::request_t> > &buffer = this->_buffered_requests;
-		while(!buffer.empty())
-			buffer.pop();
+		if(buffer.size()>0)
+		{
+			RABBIT_MQ_LOG("%d buffered reqs cleared.", buffer.size());
+			while(!buffer.empty())
+				buffer.pop();
+		}
 	}
 
 	void buffer_req(boost::shared_ptr<rabbit_mq_impl::request_t> new_req, bool force=false)
@@ -450,6 +454,7 @@ private:
 				this->_alloc_result = boost::system::errc::operation_canceled;
 				return;
 			}
+			boost::mutex::scoped_lock lock(parent->_connection_access_lock);
 
 			for(int i=0; i<parent->_chn_max_num; ++i)
 			{
@@ -457,6 +462,7 @@ private:
 				boost::shared_ptr<channel_t> channel(new channel_t(channel_idx));
 				parent->push_channel(parent->_not_available_channels, channel);
 			}
+			RABBIT_MQ_LOG("%d chns created", parent->_chn_max_num);
 
 			parent->_connection = amqp_new_connection();
 			parent->_socket = amqp_tcp_socket_new(parent->_connection);
@@ -556,6 +562,7 @@ private:
 				this->_login_result = boost::system::errc::operation_canceled;
 				return;
 			}
+			boost::mutex::scoped_lock lock(parent->_connection_access_lock);
 
 			if(amqp_login(parent->_connection, parent->_virtual_host.c_str(), 
 				parent->_chn_max_num, parent->_frame_max_size, 
@@ -648,6 +655,7 @@ private:
 				this->_read_result = boost::system::errc::operation_canceled;
 				return;
 			}
+			boost::mutex::scoped_lock lock(parent->_connection_access_lock);
 
 			if(!_used_channel.get())
 			{
@@ -749,6 +757,7 @@ private:
 				this->_write_result = boost::system::errc::operation_canceled;
 				return;
 			}
+			boost::mutex::scoped_lock lock(parent->_connection_access_lock);
 
 			if(!_used_channel.get())
 			{
@@ -761,6 +770,7 @@ private:
 				amqp_channel_open(parent->_connection, _used_channel->_chn_idx);
 				if(amqp_get_rpc_reply(parent->_connection).reply_type!=AMQP_RESPONSE_NORMAL)
 				{
+					RABBIT_MQ_LOG("channel %d opened failed.", _used_channel->_chn_idx);
 					this->_write_result = boost::system::errc::io_error;
 					return;
 				}
@@ -782,6 +792,7 @@ private:
 				0, 0, 
 				&props, amqp_cstring_bytes(s.c_str()))!=AMQP_STATUS_OK)
 			{
+				RABBIT_MQ_LOG("msg \"%s\" written failed.", s.c_str());
 				this->_write_result = boost::system::errc::io_error;
 				return;
 			}
@@ -838,6 +849,7 @@ private:
 				this->_shutdown_result = boost::system::errc::operation_canceled;
 				return;
 			}
+			boost::mutex::scoped_lock lock(parent->_connection_access_lock);
 
 			// 将available_channel都协商关闭
 			typedef boost::shared_ptr<rabbit_mq_impl::channel_t> channel_ptr_t;
@@ -982,8 +994,11 @@ private:
 	event_loop *_ev;
 	boost::shared_ptr<async_proxy> _async_proxy;
 	int _async_proxy_parallel_num;
+
 	amqp_connection_state_t _connection;
 	amqp_socket_t *_socket;
+	boost::mutex _connection_access_lock;
+	
 	std::queue<boost::shared_ptr<channel_t> > _not_available_channels;
 	std::queue<boost::shared_ptr<channel_t> > _available_channels;
 
