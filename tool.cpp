@@ -35,7 +35,7 @@ StringJoiner::StringJoiner(char ch) : _ch(ch)
 {
 }
 
-std::string StringJoiner::operator()(const std::vector<std::string> &l)
+std::string StringJoiner::operator()(const std::vector<std::string> &l) const
 {
 	return this->operator()(l.begin(), l.end());
 }

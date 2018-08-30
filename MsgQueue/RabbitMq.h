@@ -17,15 +17,24 @@ class rabbit_mq
 {
 public:
 	rabbit_mq();
-
 	rabbit_mq& bindEventLoop(event_loop *ev, int parallel_num=0);
+
+	std::string getBrokerHostIp() const;
+	int getBrokerHostPort() const;
+	int getFrameMaxSize() const;
 	rabbit_mq& setBrokerHost(std::string ip, int port=0);
 	rabbit_mq& setFrameMaxSize(int max_size);
+	int getConnectTimeout() const;
 	rabbit_mq& setConnectTimeout(int millisec);
+	std::string getVirtualHost() const;
 	rabbit_mq& setVirtualHost(std::string vhost);
+	std::string getUserName() const;
 	rabbit_mq& setUserName(std::string username);
+	std::string getPassword() const;
 	rabbit_mq& setPassword(std::string password);
+	int getChannelMaxNum() const;
 	rabbit_mq& setChannelMaxNum(int max_num);
+
 	rabbit_mq& withExchange(std::string exchange);
 	rabbit_mq& withRoutingKey(std::string routing_key);
 	rabbit_mq& withQueue(std::string queue);

@@ -15,10 +15,25 @@ rabbit_mq& rabbit_mq::bindEventLoop(event_loop *ev, int parallel_num)
 	return *this;
 }
 
+std::string rabbit_mq::getBrokerHostIp() const
+{
+	return this->_impl->getBrokerHostIp();
+}
+
+int rabbit_mq::getBrokerHostPort() const
+{
+	return this->_impl->getBrokerHostPort();
+}
+
 rabbit_mq& rabbit_mq::setBrokerHost(std::string ip, int port)
 {
 	this->_impl->setBrokerHost(ip, port);
 	return *this;
+}
+
+int rabbit_mq::getFrameMaxSize() const
+{
+	return this->_impl->getFrameMaxSize();
 }
 
 rabbit_mq& rabbit_mq::setFrameMaxSize(int max_size)
@@ -27,10 +42,20 @@ rabbit_mq& rabbit_mq::setFrameMaxSize(int max_size)
 	return *this;
 }
 
+int rabbit_mq::getConnectTimeout() const
+{
+	return this->_impl->getConnectTimeout();
+}
+
 rabbit_mq& rabbit_mq::setConnectTimeout(int millisec)
 {
 	this->_impl->setConnectTimeout(millisec);
 	return *this;
+}
+
+std::string rabbit_mq::getVirtualHost() const
+{
+	return this->_impl->getVirtualHost();
 }
 
 rabbit_mq& rabbit_mq::setVirtualHost(std::string vhost)
@@ -39,16 +64,31 @@ rabbit_mq& rabbit_mq::setVirtualHost(std::string vhost)
 	return *this;
 }
 
+std::string rabbit_mq::getUserName() const
+{
+	return this->_impl->getUserName();
+}
+
 rabbit_mq& rabbit_mq::setUserName(std::string username)
 {
 	this->_impl->setUserName(username);
 	return *this;
 }
 
+std::string rabbit_mq::getPassword() const
+{
+	return this->_impl->getPassword();
+}
+
 rabbit_mq& rabbit_mq::setPassword(std::string password)
 {
 	this->_impl->setPassword(password);
 	return *this;
+}
+
+int rabbit_mq::getChannelMaxNum() const
+{
+	return this->_impl->getChannelMaxNum();
 }
 
 rabbit_mq& rabbit_mq::setChannelMaxNum(int max_num)
@@ -86,12 +126,7 @@ void rabbit_mq::shutdown_later()
 	this->_impl->shutdown_later();
 }
 
-
-#ifdef RABBIT_MSG_QUEUE_RECV_TEST
-
-#endif
-
-#ifdef RABBIT_MSG_QUEUE_SEND_TEST
+#if defined(RABBIT_MSG_QUEUE_RECV_TEST) || defined(RABBIT_MSG_QUEUE_SEND_TEST)
 #include "MsgQueueTerminal.h"
 #include "RabbitMq.h"
 #include <boost/system/error_code.hpp>
@@ -102,6 +137,31 @@ void rabbit_mq::shutdown_later()
 
 struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 {
+	struct recv_context
+	{
+		recv_context(boost::shared_ptr<custom_logic> parent) : _parent(parent){}
+		void onReaded(const boost::system::error_code &ec, std::size_t bytes_transferred)
+		{
+			std::cout<<"custom_logic::send_context::onReaded : "<<pthread_self()<<std::endl;
+			if(ec)
+				throw boost::system::system_error(ec);
+
+			_buf.commit(bytes_transferred);
+			std::string received_s(
+				boost::asio::buffers_begin(_buf.data()), 
+				boost::asio::buffers_end(_buf.data())
+			); 
+			_buf.consume(bytes_transferred);
+			fprintf(stdout, "%s : %d bytes readed : %s\n", 
+				__FUNCTION__, bytes_transferred, received_s.c_str()
+			);
+
+			_parent->recv();
+		}
+		boost::shared_ptr<custom_logic> _parent;
+		boost::asio::streambuf _buf;
+	};
+
 	struct send_context
 	{
 		send_context(boost::shared_ptr<custom_logic> parent) : _parent(parent){}
@@ -124,7 +184,7 @@ struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 
 	custom_logic(event_loop *ev, boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal) : 
 		_ev(ev), _terminal(terminal), 
-		_limit(50)
+		_send_limit(50)
 	{
 	}
 
@@ -141,17 +201,17 @@ struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 		const int last = 0;
 		for(size_t i=0; i<10; ++i)
 		{
-			if(_limit--<=last)
+			if(_send_limit--<=last)
 				return false;
 			bool this_is_last = false;
-			if(_limit==last)
+			if(_send_limit==last)
 				this_is_last = true;
 
 			boost::shared_ptr<send_context> context(new send_context(shared_from_this()));
 			boost::asio::streambuf &buf = context->_buf;
 			std::ostream os(&buf);
 			if(!this_is_last)
-				os<<_limit<<std::endl;
+				os<<_send_limit<<std::endl;
 			else
 				os<<"exit";
 			(*_terminal).withExchange("test.topic")
@@ -162,17 +222,54 @@ struct custom_logic : public boost::enable_shared_from_this<custom_logic>
 			);
 			//return true;
 		}
-		if(_limit<=last)
+		if(_send_limit<=last)
 			return false;
 		else
 			return true;
 	}
 
+	void recv()
+	{
+		boost::shared_ptr<recv_context> context(new recv_context(shared_from_this()));
+		boost::asio::streambuf &buf = context->_buf;
+		(*_terminal).withQueue("test.queue1");
+		_terminal->async_read_some(
+			buf.prepare(_terminal->getFrameMaxSize()), 
+			boost::bind(&recv_context::onReaded, context, _1, _2)
+		);
+	}
+
 	event_loop *_ev;
 	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > _terminal;
-	int _limit;
+	int _send_limit;
 };
+#endif
 
+#ifdef RABBIT_MSG_QUEUE_RECV_TEST
+int main()
+{
+	event_loop ev;
+	boost::shared_ptr<msg_queue_terminal<rabbit_mq> > terminal = msg_queue_terminal<rabbit_mq>::build();
+	(*terminal).bindEventLoop(&ev, 10)
+		.setBrokerHost("127.0.0.1")
+		.setConnectTimeout(1000)
+		.setVirtualHost("/")
+		.setUserName("guest")
+		.setPassword("guest")
+		.setChannelMaxNum(10);
+
+	boost::shared_ptr<custom_logic> logic = boost::make_shared<custom_logic>(&ev, terminal);
+
+	boost::shared_ptr<boost::asio::steady_timer> timer(new boost::asio::steady_timer(ev.get_io_service()));
+	timer->expires_from_now(boost::chrono::microseconds(0));
+	timer->async_wait(boost::bind(&custom_logic::recv, logic));
+
+	std::cout<<"main : "<<pthread_self()<<std::endl;
+	return ev.exec();
+}
+#endif
+
+#ifdef RABBIT_MSG_QUEUE_SEND_TEST
 int main()
 {
 	event_loop ev;

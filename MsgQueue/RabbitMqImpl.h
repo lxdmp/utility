@@ -11,7 +11,7 @@
 #include "MsgQueueTerminalUtil.h"
 
 #define RABBIT_MQ_ENABLE_LOG
-//#undef RABBIT_MQ_ENABLE_LOG
+#undef RABBIT_MQ_ENABLE_LOG
 
 #if defined(RABBIT_MQ_ENABLE_LOG)
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -92,6 +92,15 @@ public:
 			this->_async_proxy_parallel_num = rabbit_mq_default_parallel_num;
 	}
 
+	std::string getBrokerHostIp() const
+	{
+		return _broker_ip;
+	}
+	int getBrokerHostPort() const
+	{
+		return _broker_port;
+	}
+	
 	void setBrokerHost(const std::string &ip, int port)
 	{
 		_broker_ip = ip;
@@ -99,6 +108,11 @@ public:
 			_broker_port = port;
 		else
 			_broker_port = rabbit_mq_default_port;
+	}
+
+	int getFrameMaxSize() const
+	{
+		return _frame_max_size;
 	}
 
 	void setFrameMaxSize(int max_size)
@@ -109,12 +123,22 @@ public:
 			this->_frame_max_size = rabbit_mq_default_max_size;
 	}
 
+	int getConnectTimeout() const
+	{
+		return _connect_timeout_val;
+	}
+	
 	void setConnectTimeout(int millisec)
 	{
 		if(millisec>0)
 			this->_connect_timeout_val = millisec;
 		else
 			this->_connect_timeout_val = rabbit_mq_default_connect_timeout_val;
+	}
+
+	std::string getVirtualHost() const
+	{
+		return _virtual_host;
 	}
 	
 	void setVirtualHost(const std::string &vhost)
@@ -125,6 +149,11 @@ public:
 			this->_virtual_host = rabbit_mq_default_vhost;
 	}
 
+	std::string getUserName() const
+	{
+		return _username;
+	}
+
 	void setUserName(const std::string &username)
 	{
 		if(!username.empty())
@@ -133,12 +162,22 @@ public:
 			this->_username = rabbit_mq_default_username;
 	}
 
+	std::string getPassword() const
+	{
+		return _password;
+	}
+
 	void setPassword(const std::string &password)
 	{
 		if(!password.empty())
 			this->_password = password;
 		else
 			this->_password = rabbit_mq_default_password;
+	}
+
+	int getChannelMaxNum() const
+	{
+		return _chn_max_num;
 	}
 	
 	void setChannelMaxNum(int max_num)
@@ -674,26 +713,37 @@ private:
 				_used_channel->open();
 			}
 
-			if(amqp_basic_get(parent->_connection, _used_channel->_chn_idx,
-				amqp_cstring_bytes(this->_with_queue), true).reply_type!=AMQP_RESPONSE_NORMAL)
+			/*
+			 * 通过amqp_basic_get & amqp_read_message读取信息有这样一种问题:
+			 * 若读取前有数据,能够读到数据;
+			 * 若读取前没有数据,会阻塞在amqp_read_message上,在队列上有数据后,不能被唤醒.
+			 * 在amqp_read_message前检测数据是否为空.
+			 */
+		TRY_READ_ONCE_IF_NO_MSG:
+			amqp_rpc_reply_t result = amqp_basic_get(parent->_connection, _used_channel->_chn_idx,
+				amqp_cstring_bytes(this->_with_queue.c_str()), true
+			);
+			if(result.reply_type!=AMQP_RESPONSE_NORMAL)
 			{
-				this->_read_result = boost::system::errc::no_message_available;
+				this->_read_result = boost::system::errc::io_error;
 				return;
+			}else if(result.reply.id==AMQP_BASIC_GET_EMPTY_METHOD)
+			{
+				boost::this_thread::sleep(boost::posix_time::microseconds(50000));
+				goto TRY_READ_ONCE_IF_NO_MSG;
 			}
-
+		
 			amqp_message_t message;
 			if(amqp_read_message(parent->_connection, _used_channel->_chn_idx, 
 				&message, 0).reply_type!=AMQP_RESPONSE_NORMAL)
 			{
-				amqp_destroy_message(&message);
-				this->_read_result = boost::system::errc::no_message;
+				this->_read_result = boost::system::errc::io_error;
 				return;
 			}
 
 			void *data = message.body.bytes;
 			this->_bytes_readed = message.body.len;
 			boost::asio::buffer_copy(this->_buffer, boost::asio::buffer(data, this->_bytes_readed));
-
 			amqp_destroy_message(&message);
 		}
 
