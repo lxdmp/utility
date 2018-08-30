@@ -6,9 +6,9 @@
 #undef ENABLE_LOG
 
 #if defined(ENABLE_LOG)
-#define LOG(format, ...) fprintf(stdout, format, __VA_ARGS__)
+#define LOG(...) fprintf(stdout, __VA_ARGS__)
 #else
-#define LOG(format, ...)
+#define LOG(...)
 #endif
 
 #define CLASS_NAME async_proxy

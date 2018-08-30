@@ -44,7 +44,7 @@ void ProcessImpl::putenvprivate(std::map<std::string, std::vector<std::string> >
 	if(iter==env.end()){
 		std::vector<std::string> tmp;
 		tmp.push_back(val);
-		env.insert(std::make_pair<std::string, std::vector<std::string> >(key, tmp));
+		env.insert(std::make_pair(key, tmp));
 	}else{
 		iter->second.push_back(val);
 	}

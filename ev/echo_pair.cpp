@@ -5,9 +5,9 @@
 #undef ENABLE_LOG
 
 #if defined(ENABLE_LOG)
-#define LOG(format, ...) fprintf(stdout, format, __VA_ARGS__)
+#define LOG(...) fprintf(stdout, __VA_ARGS__)
 #else
-#define LOG(format, ...)
+#define LOG(...)
 #endif
 
 async_context::async_context(boost::shared_ptr<echo_pair> parent, boost::asio::ip::udp::socket &s) : 

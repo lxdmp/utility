@@ -15,7 +15,11 @@ struct StringSplitter
 struct StringJoiner
 {
 	StringJoiner(char ch);
-	std::string operator()(const std::vector<std::string> &l);
+	std::string operator()(const std::vector<std::string> &l) const;
+	template <typename IteratorT> 
+	std::string operator()(IteratorT begin, IteratorT end) const;
+	template<typename IteratorT, typename UnaryFunctionT> 
+	std::string operator()(IteratorT begin, IteratorT end, UnaryFunctionT func) const;
 	char _ch;
 };
 
@@ -87,4 +91,34 @@ private:
 	std::string _compressor_format;
 };
 
+/*
+ * template implementation
+ */
+template<typename IteratorT> 
+std::string StringJoiner::operator()(IteratorT begin, IteratorT end) const
+{
+	std::string res;
+	for(IteratorT iter=begin; iter!=end; ++iter)
+	{
+		if(iter!=begin)
+			res.append(1, _ch);
+		res.append(*iter);
+	}
+	return res;
+}
+
+template<typename IteratorT, typename UnaryFunctionT> 
+std::string StringJoiner::operator()(IteratorT begin, IteratorT end, UnaryFunctionT func) const
+{
+	std::string res;
+	for(IteratorT iter=begin; iter!=end; ++iter)
+	{
+		if(iter!=begin)
+			res.append(1, _ch);
+		res.append(func(*iter));
+	}
+	return res;
+}
+
 #endif
+
