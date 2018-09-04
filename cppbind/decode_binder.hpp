@@ -67,6 +67,14 @@ private:
 		e->insert(e->end(), v.begin(), v.end());
 	}
 
+	template<typename T> 
+	void decode(cJSON *content, std::set<T> *e) const
+	{
+		std::list<T> v;
+		decode(content, &v);
+		e->insert(v.begin(), v.end());
+	}
+
     template<typename T>
     void decode(cJSON *content, std::list<T> *e) const
 	{

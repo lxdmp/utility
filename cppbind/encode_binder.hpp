@@ -54,26 +54,32 @@ private:
     template<typename T>
 	cJSON* encode(std::vector<T> &e) const
 	{
-		cJSON* jv = cJSON_CreateArray();
-        for(typename std::vector<T>::iterator iter=e.begin(); iter!=e.end(); ++iter)
-		{
-			cJSON *item = encode(*iter);
-			cJSON_AddItemToArray(jv, item);
-		}
-		return jv;
+		return encode(e.begin(), e.end());
     }
+
+	template<typename T> 
+	cJSON* encode(std::set<T> &e) const
+	{
+		return encode(e.begin(), e.end());
+	}
 	
     template<typename T>
 	cJSON* encode(std::list<T> &e) const
 	{
+		return encode(e.begin(), e.end());
+    }
+
+	template<typename IteratorT> 
+	cJSON* encode(IteratorT begin, IteratorT end) const
+	{
 		cJSON* jv = cJSON_CreateArray();
-		for(typename std::list<T>::iterator iter=e.begin(); iter!=e.end(); ++iter)
+		for(;begin!=end; ++begin)
 		{
-			cJSON *item = encode(*iter);
+			cJSON *item = encode(*begin);
 			cJSON_AddItemToArray(jv, item);
 		}
 		return jv;
-    }
+	}
 
     template<typename T>
 	cJSON* encode(std::map<std::string, T> &e) const

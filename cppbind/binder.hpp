@@ -1,5 +1,5 @@
-﻿#ifndef _CPPBIND_JSONBIND_IMP_
-#define _CPPBIND_JSONBIND_IMP_
+﻿#ifndef _CPPBIND_JSONBIND_IMPL_
+#define _CPPBIND_JSONBIND_IMPL_
 
 #include <assert.h>
 #include <string>
@@ -7,6 +7,7 @@
 #include <fstream>
 #include <list>
 #include <vector>
+#include <set>
 #include <map>
 #include <boost/shared_ptr.hpp>
 #include "cppbind_exception.h"
