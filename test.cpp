@@ -21,6 +21,7 @@ public:
 		binder->bind("a7_1", a7_1);
 		binder->bind("a7_2", a7_2);
 		binder->bind("posix_time", pt);
+		binder->bind("time_duration", dt);
 		binder->bind("gregorian_date", gd);
 	}
 
@@ -40,6 +41,7 @@ public:
 		a7_2.insert(std::make_pair("abc", 123));
 		a7_2.insert(std::make_pair("ab", 321));
 		pt = boost::posix_time::ptime(boost::gregorian::date(2010, 10, 2), boost::posix_time::time_duration(10, 11, 23));
+		dt = boost::posix_time::time_duration(1, 0, 0);
 		gd = boost::gregorian::date(2013, 2, 27);
 	}
 
@@ -53,6 +55,7 @@ public:
 	std::map<std::string, int> a7_1;
 	std::map<std::string, int> a7_2;
 	JsonPosixTime pt;
+	JsonTimeDuration dt;
 	JsonGregorianDate gd;
 
 	void serialize(std::ostringstream &s) const
@@ -104,6 +107,9 @@ public:
 		s<<"pt : ";
 		s<<boost::posix_time::to_simple_string(pt);
 		s<<std::endl;
+
+		s<<"dt : ";
+		s<<boost::posix_time::to_simple_string(dt);
 
 		s<<"gd : ";
 		s<<boost::gregorian::to_simple_string(gd);

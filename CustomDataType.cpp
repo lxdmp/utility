@@ -88,7 +88,7 @@ int JsonTimeDuration::decode(const std::string &str, std::string *errmsg)
 
     boost::posix_time::time_duration *this_td = static_cast<boost::posix_time::time_duration*>(this);
 	*this_td = boost::posix_time::time_duration(
-		::atoi(time_str[0].c_str()), ::atoi(time_str[0].c_str()), ::atoi(time_str[0].c_str())
+		::atoi(time_str[0].c_str()), ::atoi(time_str[1].c_str()), ::atoi(time_str[2].c_str())
 	);
 	return 0;
 }
