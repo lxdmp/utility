@@ -30,9 +30,9 @@ ObjBaseT* ObjFactoryT<ObjDerivedT, ObjBaseT>::create(cJSON *param)
 /************
  * ObjLoader
  ************/
-template <typename ObjBaseT> 
+template <typename ObjBaseT, typename KeyT, typename KeyComparatorT> 
 template<typename ObjDerivedT> 
-void ObjLoader<ObjBaseT>::reg(std::string key)
+void ObjLoader<ObjBaseT, KeyT, KeyComparatorT>::reg(KeyT key)
 {
 	boost::shared_ptr<ObjFactoryDecl<ObjBaseT> > factory = boost::shared_ptr<ObjFactoryDecl<ObjBaseT> >(
 		new ObjFactoryT<ObjDerivedT, ObjBaseT>()
@@ -40,8 +40,8 @@ void ObjLoader<ObjBaseT>::reg(std::string key)
 	_tbl.insert(std::make_pair(key, factory));
 }
 
-template <typename ObjBaseT> 
-void ObjLoader<ObjBaseT>::load(const char *file_path, std::vector<ObjBaseT*> &out) const
+template <typename ObjBaseT, typename KeyT, typename KeyComparatorT> 
+void ObjLoader<ObjBaseT, KeyT, KeyComparatorT>::load(const char *file_path, std::vector<ObjBaseT*> &out) const
 {
 	std::ifstream ifs(file_path);
 	std::stringstream buffer;  
@@ -51,8 +51,8 @@ void ObjLoader<ObjBaseT>::load(const char *file_path, std::vector<ObjBaseT*> &ou
 	this->load(contents, out);
 }
 
-template <typename ObjBaseT> 
-void ObjLoader<ObjBaseT>::load(const std::string &content, std::vector<ObjBaseT*> &out) const
+template <typename ObjBaseT, typename KeyT, typename KeyComparatorT> 
+void ObjLoader<ObjBaseT, KeyT, KeyComparatorT>::load(const std::string &content, std::vector<ObjBaseT*> &out) const
 {
 	cJSON* root = cJSON_Parse(content.c_str());
 	if(root)
@@ -60,8 +60,8 @@ void ObjLoader<ObjBaseT>::load(const std::string &content, std::vector<ObjBaseT*
 	this->load(root, out);
 }
 
-template <typename ObjBaseT> 
-void ObjLoader<ObjBaseT>::load(cJSON *root, std::vector<ObjBaseT*> &out) const
+template <typename ObjBaseT, typename KeyT, typename KeyComparatorT> 
+void ObjLoader<ObjBaseT, KeyT, KeyComparatorT>::load(cJSON *root, std::vector<ObjBaseT*> &out) const
 {
 	for(cJSON *node=root->child; node; node=node->next)
 	{
@@ -71,11 +71,11 @@ void ObjLoader<ObjBaseT>::load(cJSON *root, std::vector<ObjBaseT*> &out) const
 	}
 }
 
-template <typename ObjBaseT> 
-ObjBaseT* ObjLoader<ObjBaseT>::load(cJSON *node, bool ignoreIllegalKey) const
+template <typename ObjBaseT, typename KeyT, typename KeyComparatorT> 
+ObjBaseT* ObjLoader<ObjBaseT, KeyT, KeyComparatorT>::load(cJSON *node, bool ignoreIllegalKey) const
 {
 	std::string obj_name(node->string);
-	typename std::map<std::string, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> > >::const_iterator factory_iter = _tbl.find(obj_name);
+	typename std::map<KeyT, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> >, KeyComparatorT>::const_iterator factory_iter = _tbl.find(obj_name);
 	if(factory_iter==_tbl.end())
 	{
 		if(!ignoreIllegalKey)
@@ -87,6 +87,19 @@ ObjBaseT* ObjLoader<ObjBaseT>::load(cJSON *node, bool ignoreIllegalKey) const
 		return NULL;
 	}
 	return factory_iter->second->create(node);
+}
+
+template <typename ObjBaseT, typename KeyT, typename KeyComparatorT> 
+ObjBaseT* ObjLoader<ObjBaseT, KeyT, KeyComparatorT>::load(KeyT key) const
+{
+	typename std::map<KeyT, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> >, KeyComparatorT>::const_iterator factory_iter = _tbl.find(key);
+	if(factory_iter==_tbl.end())
+	{
+		std::ostringstream s;
+		s<<"key named "<<key<<" without indicated loader!!";
+		throw std::runtime_error(s.str().c_str());
+	}
+	return factory_iter->second->create(NULL);
 }
 
 #endif

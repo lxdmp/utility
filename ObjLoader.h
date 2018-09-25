@@ -1,6 +1,8 @@
-﻿#ifndef _OBJ_LOADER_H_
+﻿// 具有公共接口对象的动态加载实现.
+#ifndef _OBJ_LOADER_H_
 #define _OBJ_LOADER_H_
 
+#include <string>
 #include <map>
 #include <boost/shared_ptr.hpp>
 #include "cppbind/cppbind_json.hpp"
@@ -39,22 +41,25 @@ public:
 	virtual ObjBaseT* create(cJSON *param);
 };
 
-template <typename ObjBaseT> 
+template <typename ObjBaseT, 
+	typename KeyT=std::string, 
+	typename KeyComparatorT=std::less<KeyT> > 
 class ObjLoader
 {
 public:
 	ObjLoader(){}
 
 	template<typename ObjDerivedT> 
-	void reg(std::string key);
+	void reg(KeyT key);
 
 	void load(const char *file_path, std::vector<ObjBaseT*> &out) const; // out中分配的对象需由用户程序维护
 	void load(const std::string &content, std::vector<ObjBaseT*> &out) const;
 	void load(cJSON *root, std::vector<ObjBaseT*> &out) const;
 	ObjBaseT* load(cJSON *node, bool ignoreIllegalKey=false) const;
+	ObjBaseT* load(KeyT key) const;
 
 private:
-	std::map<std::string, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> > > _tbl;
+	std::map<KeyT, boost::shared_ptr<ObjFactoryDecl<ObjBaseT> >, KeyComparatorT > _tbl;
 };
 
 #include "ObjLoaderImpl.h"
