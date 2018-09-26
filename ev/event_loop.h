@@ -1,7 +1,7 @@
 ﻿#ifndef _IO_SERVICE_H_
 #define _IO_SERVICE_H_
 
-#include "define.h"
+#include "ev_define.h"
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <boost/noncopyable.hpp>

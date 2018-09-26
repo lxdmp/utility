@@ -7,6 +7,7 @@
 
 #define BOOST_ASIO_DISABLE_STD_CHRONO
 
+#include <boost/thread.hpp>
 #include <boost/thread/shared_mutex.hpp>
 typedef boost::shared_mutex rw_mutex;
 typedef boost::shared_lock<rw_mutex> read_lock;

@@ -1,15 +1,18 @@
 ﻿#include <stdio.h>
 #include <boost/filesystem.hpp>
 #include "log.h"
+#include "tool.h"
 
-void InitRootLogger(const char *exe_path)
+void initRootLogger(const char *exe_path)
 {
+	const char config_file_name[] = "urconfig.properties";
 	log4cplus::Logger root = log4cplus::Logger::getRoot();
 	std::string path = exe_path;
-	path = path.substr(0, path.find_last_of("\\")) + "\\urconfig.properties";
+
+	path = path.substr(0, path.find_last_of(pathSeperator())) + pathSeperator() + config_file_name;
 
 	const std::string possible_path[] = {
-		"urconfig.properties", 
+		config_file_name, 
 		path
 	};
 
@@ -24,3 +27,4 @@ void InitRootLogger(const char *exe_path)
 		}
 	}
 }
+

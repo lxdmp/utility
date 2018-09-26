@@ -5,12 +5,12 @@
 #ifndef _ASYNC_PROXY_H_
 #define _ASYNC_PROXY_H_
 
+#include "ev_define.h"
 #include <boost/thread.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
 #include <boost/atomic.hpp>
 #include <queue>
-#include "define.h"
 #include "pipe.h"
 
 class event_loop;

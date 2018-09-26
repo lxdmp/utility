@@ -1,10 +1,10 @@
-﻿#ifndef __LOGGING_MARCRO_H_
-#define __LOGGING_MARCRO_H_
+﻿#ifndef _LOG_MACRO_H_
+#define _LOG_MACRO_H_
 
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/configurator.h>
 
-void InitRootLogger(const char *exe_path);
+void initRootLogger(const char *exe_path);
 
 #define LOG_FATAL(...)     \
     LOG4CPLUS_FATAL_FMT(log4cplus::Logger::getRoot(), __VA_ARGS__)
@@ -36,3 +36,4 @@ void InitRootLogger(const char *exe_path);
     LOG_TRACE("Leave %s",  __FUNCTION__)
 
 #endif
+

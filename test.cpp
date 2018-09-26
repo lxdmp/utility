@@ -168,7 +168,8 @@ void cppbind_json_test()
 }
 #endif
 
-int main()
+#include "log.h"
+int main(int argc, char *argv[])
 {
 	try{
 	#ifdef CPPBIND_JSON_TEST
@@ -195,7 +196,9 @@ int main()
 			return s.str();
 		})<<std::endl;
 	}
-
+	
+	initRootLogger(argv[0]);
+	LOG_INFO("test here");
 	return 0;
 }
 
