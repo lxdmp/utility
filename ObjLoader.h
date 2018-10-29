@@ -52,9 +52,12 @@ public:
 	template<typename ObjDerivedT> 
 	void reg(KeyT key);
 
+	// 加载一组对象
 	void load(const char *file_path, std::vector<ObjBaseT*> &out) const; // out中分配的对象需由用户程序维护
 	void load(const std::string &content, std::vector<ObjBaseT*> &out) const;
 	void load(cJSON *root, std::vector<ObjBaseT*> &out) const;
+
+	// 加载一个对象
 	ObjBaseT* load(cJSON *node, bool ignoreIllegalKey=false) const;
 	ObjBaseT* load(KeyT key) const;
 
